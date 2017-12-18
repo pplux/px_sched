@@ -6,7 +6,7 @@ Written in C++11, with no dependency, and easy to integrate. See the [examples](
 ## Goals:
 * Portable, written in C++11 with no dependency
 * Easy to use, flexible, and lightweight
-* Inspied by Naughty Dog's talk [Parallelizing the Naughty Dog Engine](https://www.gdcvault.com/play/1022186/Parallelizing-the-Naughty-Dog-Engine) and [enkiTS](https://github.com/dougbinks/enkiTS)
+* Inspied by Naughty Dog's talk [Parallelizing the Naughty Dog Engine](https://www.gdcvault.com/play/1022186/Parallelizing-the-Naughty-Dog-Engine), [enkiTS](https://github.com/dougbinks/enkiTS), and [STB's single-file libraries](https://github.com/nothings/stb)
 * No memory allocation, all memory is allocated at [initialization](https://github.com/pplux/px_sched/blob/083ea2cf5558662b75d4232db04b4c510cb59ab0/px_sched.h#L112).
 
 ## API:
