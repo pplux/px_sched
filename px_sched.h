@@ -24,15 +24,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // -- Job Object ----------------------------------------------------------
 // if you want to use your own job objects, define the following
-// macro and provide a struct px::Job class with an operator() method
-// similar to the default implementation:
+// macro and provide a struct px::Job object with an operator() method.
+//
+// Example, a C-like pointer to function:
+//
+//    #define PX_SCHED_CUSTOM_JOB_DEFINITION
+//    namespace px {
+//      struct Job {
+//        void (*func)(void *arg);
+//        void *arg;
+//        void operator()() { func(arg); }
+//      };
+//    } // px namespace
+//
+//  By default Jobs are simply std::function<void()>
+//
 #ifndef PX_SCHED_CUSTOM_JOB_DEFINITION
+#include <functional>
 namespace px {
-  struct Job {
-    void (*func)(void *arg);
-    void *arg;
-    void operator()() { func(arg); }
-  };
+  typedef std::function<void()> Job;
 } // px namespace
 #endif
 // -----------------------------------------------------------------------------
