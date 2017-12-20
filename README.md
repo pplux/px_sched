@@ -1,4 +1,6 @@
-﻿# px_sched
+[![Build Status](https://travis-ci.org/pplux/px_sched.svg?branch=master)](https://travis-ci.org/pplux/px_sched)
+
+# px_sched
 Single Header C++ Task Scheduler 
 
 Written in C++11, with no dependency, and easy to integrate. See the [examples](https://github.com/pplux/px_sched/tree/master/examples).
