@@ -1,0 +1,17 @@
+language: cpp
+matrix:
+  include:
+    - compiler: gcc
+      os: linux
+    - compiler: clang
+      os: osx
+
+script:
+  - cd examples; make
+
+branches:
+  only:
+    - master
+
+notifications:
+  email: false
