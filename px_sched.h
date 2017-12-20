@@ -585,9 +585,9 @@ namespace px {
   }
   
   void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) const {
-    int p = 0;
-    int n = 0;
-    #define _ADD(...) {p +=n; (n >= 0) && (p < buffer_size) && (n = snprintf(buffer+p, buffer_size-p,__VA_ARGS__));}
+    size_t p = 0;
+    size_t n = 0;
+    #define _ADD(...) {p +=n; (p < buffer_size) && (n = snprintf(buffer+p, buffer_size-p,__VA_ARGS__));}
     _ADD("CPUS:0    5    10   15   20   25   30   35   40   45   50   55   60   65   70   75\n");
     _ADD("%4u:", (uint32_t)active_threads_.load());
     for(size_t i = 0; i < params_.num_threads; ++i) {

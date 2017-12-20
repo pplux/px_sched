@@ -8,7 +8,7 @@ endif
 examples = example1 example2 example3 example4 example5 example6
 all: $(examples)
 
-$(examples): %: %.cpp
+$(examples): %: %.cpp ../px_sched.h
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 .PHONY: clean
