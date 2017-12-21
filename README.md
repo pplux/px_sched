@@ -6,6 +6,8 @@ Single Header C++ Task Scheduler
 Written in C++11, with no dependency, and easy to integrate. See the [examples](https://github.com/pplux/px_sched/tree/master/examples).
 
 ## Goals:
+* Allow task oriented multihtread programmming without mutexes, locks, condition variables...
+* Implicit task graph dependency for single or groups of tasks
 * Portable, written in C++11 with no dependency
 * Easy to use, flexible, and lightweight
 * Inspied by Naughty Dog's talk [Parallelizing the Naughty Dog Engine](https://www.gdcvault.com/play/1022186/Parallelizing-the-Naughty-Dog-Engine), [enkiTS](https://github.com/dougbinks/enkiTS), and [STB's single-file libraries](https://github.com/nothings/stb)
@@ -19,6 +21,8 @@ int main(int, char **) {
   schd.init();
 
   px::Sync s1,s2,s3;
+  
+  // First we launch a group of 10 concurrent tasks, all of them referencing the same sync object (s1)
   for(size_t i = 0; i < 10; ++i) {
     auto job = [i] {
       printf("Phase 1: Task %zu completed from %s\n",
@@ -27,6 +31,8 @@ int main(int, char **) {
     schd.run(job, &s1);
   }
 
+  // Another set of 10 concurrent tasks will be launched, once the first group (s1) finishes.
+  // The second group will be attached to the second Sync object (s2).
   for(size_t i = 0; i < 10; ++i) {
     auto job = [i] {
       printf("Phase 2: Task %zu completed from %s\n",
@@ -35,6 +41,7 @@ int main(int, char **) {
     schd.runAfter(s1, job, &s2);
   }
 
+  // Finally another group, waiting for the second (s2) fo finish. 
   for(size_t i = 0; i < 10; ++i) {
     auto job = [i] {
       printf("Phase 3: Task %zu completed from %s\n",
@@ -43,7 +50,11 @@ int main(int, char **) {
     schd.runAfter(s2, job, &s3);
   }
 
+  // Sync objects can be copied, internally they are just a handle.
   px::Sync last = s3;
+  
+  // The main thread will now wait for the last task to finish, the task graph is infered by the 
+  // usage of sync objects and no wait has ocurred on the main thread until now. 
   printf("Waiting for tasks to finish...\n");
   schd.waitFor(last); // wait for all tasks to finish
   printf("Waiting for tasks to finish...DONE \n");
