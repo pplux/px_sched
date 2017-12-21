@@ -90,7 +90,7 @@ namespace px {
         printf(__VA_ARGS__);\
         printf("\n--------------------------------------\n"); \
         abort(); \
-      } 
+      }
 #endif
 
 #include <thread>
@@ -110,7 +110,7 @@ namespace px {
   };
 
   struct SchedulerParams {
-    uint16_t num_threads = 16;        // num OS threads created 
+    uint16_t num_threads = 16;        // num OS threads created
     uint16_t max_running_threads = 0; // 0 --> will be set to max hardware concurrency
     uint16_t max_number_tasks = 1024; // max number of simultaneous tasks
     uint16_t thread_num_tries_on_idle = 16;   // number of tries before suspend the thread
@@ -185,7 +185,7 @@ namespace px {
 
     void run(const Job &job, Sync *out_sync_obj = nullptr);
     void runAfter(Sync sync,const Job &job, Sync *out_sync_obj = nullptr);
-    void waitFor(Sync sync); //< suspend current thread 
+    void waitFor(Sync sync); //< suspend current thread
     void getDebugStatus(char *buffer, size_t buffer_size) const;
 
     // manually increment the value of a Sync object. Sync objects triggers
@@ -195,7 +195,7 @@ namespace px {
     void incrementSync(Sync *s);
 
     // manually decrement the value of a Sync object.
-    // *WARNING*: never call decrement on a sync object wihtout calling 
+    // *WARNING*: never call decrement on a sync object wihtout calling
     //            @incrementSync first.
     void decrementSync(Sync *s);
 
@@ -266,7 +266,7 @@ namespace px {
     };
 
     struct WaitFor {
-      explicit WaitFor() 
+      explicit WaitFor()
         : owner(std::this_thread::get_id())
         , ready(false) {}
       void wait() {
@@ -318,7 +318,7 @@ namespace px {
     IndexQueue ready_tasks_;
 
     static void WorkerThreadMain(Scheduler *schd, uint16_t id);
-#endif 
+#endif
 
   };
 
@@ -326,7 +326,7 @@ namespace px {
   template<class T>
   inline void ObjectPool<T>::init(uint32_t count) {
     data_ = std::unique_ptr<D[]>(new D[count]);
-    for(auto i = 0; i < count; ++i) {
+    for(uint32_t i = 0; i < count; ++i) {
       data_[i].state = (0xFFF)<< kVerDisp;
     }
     count_ = count;
@@ -391,7 +391,7 @@ namespace px {
         std::this_thread::sleep_for(std::chrono::milliseconds(tries-count_));
       }
       if (tries % 20) {
-        printf("Could not adquire value = %x[%lu] num tries %u\n", expected, pos%count_, tries); 
+        printf("Could not adquire value = %x[%lu] num tries %u\n", expected, pos%count_, tries);
       }
 #endif
     }
@@ -542,7 +542,7 @@ namespace px {
 #endif // PX_SCHED_IMP_SINGLE_THREAD
 
 #if PX_SCHED_IMP_REGULAR_THREADS
-// Default implementation using threads 
+// Default implementation using threads
 #include <thread>
 namespace px {
   Scheduler::Scheduler() {
@@ -583,7 +583,7 @@ namespace px {
       PX_SCHED_CHECK(active_threads_.load() == 0, "Invalid active threads num --> %u", active_threads_.load());
     }
   }
-  
+
   void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) const {
     size_t p = 0;
     size_t n = 0;
@@ -695,9 +695,9 @@ namespace px {
       WaitFor wf;
       counter.wait_ptr = &wf;
       unrefCounter(s.hnd);
-      CurrentThreadSleeps(); 
+      CurrentThreadSleeps();
       wf.wait();
-      CurrentThreadWakesUp(); 
+      CurrentThreadWakesUp();
     }
   }
 
@@ -705,12 +705,12 @@ namespace px {
     if (counters_.ref(hnd)) {
       counters_.unref(hnd);
       Scheduler *schd = this;
-      counters_.unref(hnd, [schd, hnd](Counter &c) {
-        // wake up all tasks 
+      counters_.unref(hnd, [schd](Counter &c) {
+        // wake up all tasks
         uint32_t tid = c.task_id;
         while (schd->tasks_.ref(tid)) {
           Task &task = schd->tasks_.get(tid);
-          uint32_t next_tid = task.next_sibling_task; 
+          uint32_t next_tid = task.next_sibling_task;
           task.next_sibling_task = 0;
           schd->ready_tasks_.push(tid);
           schd->wakeUpOneThread();
