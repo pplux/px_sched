@@ -20,15 +20,15 @@ int main(int, char **) {
   px::Sync last;
   schd.runAfter(s, [&schd]{
     printf("Phase 2\n");
-    px::Sync s;
+    px::Sync s2;
     for(size_t i = 0; i < 10; ++i) {
       auto job = [i] {
         printf("Phase 2: Task %zu completed from %s\n",
          i, px::Scheduler::current_thread_name());
       };
-      schd.run(job, &s);
+      schd.run(job, &s2);
     }
-    schd.waitFor(s);
+    schd.waitFor(s2);
     printf("Phase 2, done\n");
    }, &last);
 
