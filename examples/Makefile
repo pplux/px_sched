@@ -9,7 +9,6 @@ CXXFLAGS=-std=c++11 -pedantic \
 	-Wextra \
 	-Wformat=2 \
 	-Winit-self \
-	-Wmissing-declarations \
 	-Wmissing-include-dirs \
 	-Wno-unused\
 	-Wold-style-cast \
