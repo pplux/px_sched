@@ -98,7 +98,6 @@ namespace px {
 #include <condition_variable>
 #include <atomic>
 #include <cstring>
-#include <unordered_map>
 #include <memory>
 
 namespace px {
@@ -470,6 +469,12 @@ namespace px {
 
 #ifdef PX_SCHED_IMPLEMENTATION
 
+#ifdef PX_SCHED_CUSTOM_TLS
+// used to store custom TLS... some platfor might have problems with
+// TLS (iOS usted to be one)
+#include <unordered_map>
+#endif
+
 namespace px {
 
   struct Scheduler::TLS {
@@ -478,6 +483,7 @@ namespace px {
   };
 
   Scheduler::TLS* Scheduler::tls() {
+#ifdef PX_SCHED_CUSTOM_TLS
     static std::unordered_map<std::thread::id, TLS> data;
     static std::atomic<bool> in_use = {false};
     for(;;) {
@@ -487,6 +493,10 @@ namespace px {
     auto result = &data[std::this_thread::get_id()];
     in_use = false;
     return result;
+#else
+    static thread_local TLS tls;
+    return &tls;
+#endif
   }
 
   void Scheduler::set_current_thread_name(const char *name) {
