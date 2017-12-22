@@ -326,8 +326,8 @@ namespace px {
   template<class T>
   inline void ObjectPool<T>::init(uint32_t count) {
     data_ = std::unique_ptr<D[]>(new D[count]);
-    for(auto i = 0; i < count; ++i) {
-      data_[i].state = (0xFFF)<< kVerDisp;
+    for(uint32_t i = 0; i < count; ++i) {
+      data_[i].state = 0xFFFu<< kVerDisp;
     }
     count_ = count;
     next_ = 0;
@@ -586,10 +586,10 @@ namespace px {
   
   void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) const {
     size_t p = 0;
-    size_t n = 0;
-    #define _ADD(...) {p +=n; (p < buffer_size) && (n = snprintf(buffer+p, buffer_size-p,__VA_ARGS__));}
+    int n = 0;
+    #define _ADD(...) {p += static_cast<size_t>(n); (p < buffer_size) && (n = snprintf(buffer+p, buffer_size-p,__VA_ARGS__));}
     _ADD("CPUS:0    5    10   15   20   25   30   35   40   45   50   55   60   65   70   75\n");
-    _ADD("%4u:", (uint32_t)active_threads_.load());
+    _ADD("%4u:", active_threads_.load());
     for(size_t i = 0; i < params_.num_threads; ++i) {
       _ADD( (workers_[i].wake_up.load() == nullptr)?"*":".");
     }
@@ -640,7 +640,7 @@ namespace px {
 
   uint16_t Scheduler::wakeUpThreads(uint16_t max_num_threads) {
     uint16_t woken_up = 0;
-    for(auto i = 0; (i < params_.num_threads) && (woken_up < max_num_threads); ++i) {
+    for(uint32_t i = 0; (i < params_.num_threads) && (woken_up < max_num_threads); ++i) {
       WaitFor *wake_up = workers_[i].wake_up.exchange(nullptr);
       if (wake_up) {
         wake_up->signal();
@@ -705,7 +705,7 @@ namespace px {
     if (counters_.ref(hnd)) {
       counters_.unref(hnd);
       Scheduler *schd = this;
-      counters_.unref(hnd, [schd, hnd](Counter &c) {
+      counters_.unref(hnd, [schd](Counter &c) {
         // wake up all tasks 
         uint32_t tid = c.task_id;
         while (schd->tasks_.ref(tid)) {
@@ -763,7 +763,6 @@ namespace px {
             current_num > schd->params_.max_running_threads) {
           WaitFor wf;
           schd->workers_[id].wake_up = &wf;
-          char buffer[32];
           snprintf(buffer, 32, "Worker-%u [SLEEP]", id);
           schd->set_current_thread_name(buffer);
           wf.wait();
