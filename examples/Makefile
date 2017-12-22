@@ -12,7 +12,6 @@ CXXFLAGS=-std=c++11 -pedantic \
 	-Wmissing-declarations \
 	-Wmissing-include-dirs \
 	-Wno-unused\
-	-Wnull-dereference -pedantic \
 	-Wold-style-cast \
 	-Woverloaded-virtual \
 	-Wredundant-decls \
