@@ -469,7 +469,7 @@ namespace px {
 
 #ifdef PX_SCHED_IMPLEMENTATION
 
-#ifdef PX_SCHED_CUSTOM_TLS
+#ifdef PX_SCHED_ATLERNATIVE_TLS
 // used to store custom TLS... some platfor might have problems with
 // TLS (iOS usted to be one)
 #include <unordered_map>
@@ -483,7 +483,7 @@ namespace px {
   };
 
   Scheduler::TLS* Scheduler::tls() {
-#ifdef PX_SCHED_CUSTOM_TLS
+#ifdef PX_SCHED_ATLERNATIVE_TLS
     static std::unordered_map<std::thread::id, TLS> data;
     static std::atomic<bool> in_use = {false};
     for(;;) {
