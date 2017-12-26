@@ -99,6 +99,7 @@ namespace px {
 #include <atomic>
 #include <cstring>
 #include <memory>
+#include <stdlib.h>
 
 namespace px {
 
@@ -108,14 +109,19 @@ namespace px {
     friend class Scheduler;
   };
 
+
+  struct MemCallbacks {
+    void* (*alloc_fn)(size_t amount) = ::malloc;
+    void (*free_fn)(void *ptr) = ::free;
+  };
+
   struct SchedulerParams {
     uint16_t num_threads = 16;        // num OS threads created 
     uint16_t max_running_threads = 0; // 0 --> will be set to max hardware concurrency
     uint16_t max_number_tasks = 1024; // max number of simultaneous tasks
     uint16_t thread_num_tries_on_idle = 16;   // number of tries before suspend the thread
     uint32_t thread_sleep_on_idle_in_microseconds = 5; // time spent waiting between tries
-    // TODO:
-    // uint16_t max_number_fibers = 128; // number of fibers (not all platforms)
+    MemCallbacks mem_callbacks;
   };
 
 
@@ -131,7 +137,9 @@ namespace px {
     const uint32_t kVerMask = 0xFFF00000; // 12 bits
     const uint32_t kVerDisp = 20;
 
-    void init(uint32_t count);
+    ~ObjectPool();
+
+    void init(uint32_t count, const MemCallbacks &mem = MemCallbacks());
     void reset();
 
     // only access objects you've previously referenced
@@ -162,15 +170,18 @@ namespace px {
     bool ref(uint32_t hnd) const;
 
   private:
+    void newElement(uint32_t pos) const;
+    void deleteElement(uint32_t pos) const;
     struct D {
       T element;
       mutable std::atomic<uint32_t> state = {0};
       uint32_t version = 0;
       char padding[64]; // Avoid false sharing between threads
     };
-    std::unique_ptr<D[]> data_;
+    D *data_ = nullptr;
     std::atomic<uint32_t> next_;
     size_t count_ = 0;
+    MemCallbacks mem_;
   };
 
 
@@ -199,6 +210,8 @@ namespace px {
     void decrementSync(Sync *s);
 
     // By default workers will be named as Worker-id
+    // The pointer passed here must be valid until set_current_thread is called
+    // again...
     static void set_current_thread_name(const char *name);
     static const char *current_thread_name();
 
@@ -218,11 +231,24 @@ namespace px {
 
 #ifdef PX_SCHED_IMP_REGULAR_THREADS
     struct IndexQueue {
-      void init(uint16_t max) {
+      ~IndexQueue() {
+        PX_SCHED_CHECK(list_ == nullptr, "IndexQueue Resources leaked...");
+      }
+      void reset() {
+        if (list_) {
+          mem_.free_fn(list_);
+          list_ = nullptr;
+        }
+        size_ = 0;
+        in_use_ = 0;
+      }
+      void init(uint16_t max, const MemCallbacks &mem_cb = MemCallbacks()) {
+        reset();
+        mem_ = mem_cb;
         size_ = max;
         in_use_ = 0;
         lock_ = false;
-        list_ = std::unique_ptr<uint32_t[]>(new uint32_t[size_]);
+        list_ = static_cast<uint32_t*>(mem_.alloc_fn(sizeof(uint32_t)*size_));
       }
       void push(uint32_t p) {
         for(;;) {
@@ -248,10 +274,11 @@ namespace px {
         lock_ = false;
         return result;
       }
-      uint16_t size_;
-      volatile uint16_t in_use_;
-      std::unique_ptr<uint32_t[]> list_;
-      std::atomic<bool> lock_;
+      uint16_t size_ = 0;
+      volatile uint16_t in_use_ = 0;
+      uint32_t *list_ = nullptr;
+      std::atomic<bool> lock_ = {false};
+      MemCallbacks mem_;
     };
 
     struct Counter;
@@ -311,7 +338,7 @@ namespace px {
     uint32_t createCounter();
     void unrefCounter(uint32_t counter_hnd);
 
-    std::unique_ptr<Worker[]> workers_;
+    Worker *workers_ = nullptr;
     ObjectPool<Task> tasks_;
     ObjectPool<Counter> counters_;
     IndexQueue ready_tasks_;
@@ -323,8 +350,25 @@ namespace px {
 
   //-- Object pool implementation ----------------------------------------------
   template<class T>
-  inline void ObjectPool<T>::init(uint32_t count) {
-    data_ = std::unique_ptr<D[]>(new D[count]);
+  inline ObjectPool<T>::~ObjectPool() {
+    reset();
+  }
+  
+  template<class T>
+  void ObjectPool<T>::newElement(uint32_t pos) const {
+    new (&data_[pos].element) T();
+  }
+
+  template<class T>
+  void ObjectPool<T>::deleteElement(uint32_t pos) const {
+    data_[pos].element.~T();
+  }
+
+  template<class T>
+  inline void ObjectPool<T>::init(uint32_t count, const MemCallbacks &mem_cb) {
+    reset();
+    mem_ = mem_cb;
+    data_ = static_cast<D*>(mem_.alloc_fn(sizeof(D)*count));
     for(uint32_t i = 0; i < count; ++i) {
       data_[i].state = 0xFFFu<< kVerDisp;
     }
@@ -336,7 +380,10 @@ namespace px {
   inline void ObjectPool<T>::reset() {
     count_ = 0;
     next_ = 0;
-    data_.reset();
+    if (data_) {
+      mem_.free_fn(data_);
+      data_ = nullptr;
+    }
   }
 
   // only access objects you've previously referenced
@@ -380,6 +427,7 @@ namespace px {
       uint32_t newvalue = (newver << kVerDisp) + 2;
       uint32_t expected = version << kVerDisp;
       if (d.state.compare_exchange_strong(expected, newvalue)) {
+        newElement(pos); //< initialize
         return (newver << kVerDisp) | (pos & kPosMask);
       }
       tries++;
@@ -412,6 +460,7 @@ namespace px {
           pos, hnd);
       if (d.state.compare_exchange_strong(prev, next)) {
         if ((next & kRefMask) == 1) {
+          deleteElement(pos);
           d.state = 0;
         }
         return;
@@ -439,6 +488,7 @@ namespace px {
       if (d.state.compare_exchange_strong(prev, next)) {
         if ((next & kRefMask) == 1) {
           f(d.element);
+          deleteElement(pos);
           d.state = 0;
         }
         return;
@@ -478,7 +528,7 @@ namespace px {
 namespace px {
 
   struct Scheduler::TLS {
-    std::unique_ptr<char[]> name;
+    const char *name = nullptr;
     Scheduler *scheduler = {nullptr};
   };
 
@@ -501,18 +551,12 @@ namespace px {
 
   void Scheduler::set_current_thread_name(const char *name) {
     TLS *d = tls();
-    if (name) {
-      size_t len = strlen(name)+1;
-      d->name = std::unique_ptr<char[]>(new char[len]);
-      memcpy(d->name.get(), name, len);
-    } else {
-      d->name.reset();
-    }
+    d->name = name;
   }
 
   const char *Scheduler::current_thread_name() {
     TLS *d = tls();
-    return d->name.get();
+    return d->name;
   }
 
   void Scheduler::CurrentThreadSleeps() {
@@ -569,10 +613,14 @@ namespace px {
       params_.max_running_threads = std::thread::hardware_concurrency();
     }
     // create tasks
-    tasks_.init(params_.max_number_tasks);
-    counters_.init(params_.max_number_tasks);
-    ready_tasks_.init(params_.max_number_tasks);
-    workers_ = std::unique_ptr<Worker[]>(new Worker[params_.num_threads]);
+    tasks_.init(params_.max_number_tasks, params_.mem_callbacks);
+    counters_.init(params_.max_number_tasks, params_.mem_callbacks);
+    ready_tasks_.init(params_.max_number_tasks, params_.mem_callbacks);
+    PX_SCHED_CHECK(workers_ == nullptr, "workers_ ptr should be null here...");
+    workers_ = static_cast<Worker*>(params_.mem_callbacks.alloc_fn(sizeof(Worker)*params_.num_threads));
+    for(uint16_t i = 0; i < params_.num_threads; ++i) {
+      new (&workers_[i]) Worker();
+    }
     PX_SCHED_CHECK(active_threads_.load() == 0, "Invalid active threads num");
     for(uint16_t i = 0; i < params_.num_threads; ++i) {
       workers_[i].thread = std::thread(WorkerThreadMain, this, i);
@@ -587,9 +635,13 @@ namespace px {
       }
       for(uint16_t i = 0; i < params_.num_threads; ++i) {
         workers_[i].thread.join();
+        workers_[i].~Worker();
       }
-      workers_.reset();
+      params_.mem_callbacks.free_fn(workers_);
+      workers_ = nullptr;
       tasks_.reset();
+      counters_.reset();
+      ready_tasks_.reset();
       PX_SCHED_CHECK(active_threads_.load() == 0, "Invalid active threads num --> %u", active_threads_.load());
     }
   }
@@ -765,6 +817,8 @@ namespace px {
     auto const ttl_value = schd->params_.thread_num_tries_on_idle? schd->params_.thread_num_tries_on_idle:1;
     schd->active_threads_.fetch_add(1);
     tls()->scheduler = schd;
+    snprintf(buffer,32,"Worker-%u", id);
+    schd->set_current_thread_name(buffer);
     for(;;) {
       { // wait for new activity
         auto current_num = schd->active_threads_.fetch_sub(1);
@@ -773,15 +827,11 @@ namespace px {
             current_num > schd->params_.max_running_threads) {
           WaitFor wf;
           schd->workers_[id].wake_up = &wf;
-          snprintf(buffer, 32, "Worker-%u [SLEEP]", id);
-          schd->set_current_thread_name(buffer);
           wf.wait();
           if (!schd->running_) return;
         }
         schd->active_threads_.fetch_add(1);
         schd->workers_[id].wake_up = nullptr;
-        snprintf(buffer,32,"Worker-%u", id);
-        schd->set_current_thread_name(buffer);
       }
       auto ttl = ttl_value;
       { // do some work
@@ -803,6 +853,7 @@ namespace px {
       }
     }
     tls()->scheduler = nullptr;
+    schd->set_current_thread_name(nullptr);
   }
 } // end of px namespace
 #endif // PX_SCHED_IMP_REGULAR_THREADS

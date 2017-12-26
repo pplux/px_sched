@@ -3,10 +3,15 @@
 
 #define PX_SCHED_IMPLEMENTATION 1
 #include "../px_sched.h"
+#include "mem_check.h"
 
 int main(int, char **) {
+  atexit(mem_report);
   px::Scheduler schd;
-  schd.init();
+  px::SchedulerParams s_params;
+  s_params.mem_callbacks.alloc_fn = mem_check_alloc;
+  s_params.mem_callbacks.free_fn = mem_check_free;
+  schd.init(s_params);
 
   px::Sync s1,s2,s3;
   for(size_t i = 0; i < 10; ++i) {

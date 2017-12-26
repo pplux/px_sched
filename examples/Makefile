@@ -32,6 +32,14 @@ all: $(examples)
 $(examples): %: %.cpp ../px_sched.h
 	$(CXX) $(CXXFLAGS) -o $@ $(LDFLAGS) $<
 
-.PHONY: clean
+.PHONY: clean tests
 clean:
 	rm -f $(examples)
+
+tests: $(examples)
+	./example1 && \
+  ./example2 && \
+	./example3 && \
+	./example4 && \
+	./example5 && \
+	./example6
