@@ -93,6 +93,8 @@ namespace px {
       } 
 #endif
 
+#include <atomic>
+#include <condition_variable>
 #include <thread>
 
 namespace px {
