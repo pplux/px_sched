@@ -94,12 +94,6 @@ namespace px {
 #endif
 
 #include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <atomic>
-#include <cstring>
-#include <memory>
-#include <stdlib.h>
 
 namespace px {
 
