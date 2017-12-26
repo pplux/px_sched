@@ -3,15 +3,16 @@
 # px_sched
 Single Header C++ Task Scheduler 
 
-Written in C++11, with no dependency, and easy to integrate. See the [examples](https://github.com/pplux/px_sched/tree/master/examples).
+Written in C++11(only for thread API), with no dependency, and easy to integrate. See the [examples](https://github.com/pplux/px_sched/tree/master/examples).
 
 ## Goals:
 * Allow task oriented multihtread programmming without mutexes, locks, condition variables...
 * Implicit task graph dependency for single or groups of tasks
 * Portable, written in C++11 with no dependency
+* C++11 only used for thread, mutex, and condition variable *no STL container is used*
 * Easy to use, flexible, and lightweight
 * Inspied by Naughty Dog's talk [Parallelizing the Naughty Dog Engine](https://www.gdcvault.com/play/1022186/Parallelizing-the-Naughty-Dog-Engine), [enkiTS](https://github.com/dougbinks/enkiTS), and [STB's single-file libraries](https://github.com/nothings/stb)
-* No memory allocation, all memory is allocated at [initialization](https://github.com/pplux/px_sched/blob/083ea2cf5558662b75d4232db04b4c510cb59ab0/px_sched.h#L112).
+* No dynamic memory allocations, all memory is allocated at [initialization](https://github.com/pplux/px_sched/blob/083ea2cf5558662b75d4232db04b4c510cb59ab0/px_sched.h#L112). Easy to integrate with your own memory manager if needed.
 
 ## API:
 
