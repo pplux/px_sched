@@ -426,16 +426,8 @@ namespace px {
         return (newver << kVerDisp) | (pos & kPosMask);
       }
       tries++;
-#if 1
+      // TODO... make this, optional...
       PX_SCHED_CHECK(tries < count_*count_, "It was not possible to find a valid index after %u tries", tries);
-#else
-      if (tries > count_) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(tries-count_));
-      }
-      if (tries % 20) {
-        printf("Could not adquire value = %x[%lu] num tries %u\n", expected, pos%count_, tries); 
-      }
-#endif
     }
   }
 
@@ -806,13 +798,13 @@ namespace px {
   }
 
   void Scheduler::WorkerThreadMain(Scheduler *schd, uint16_t id) {
-    char buffer[32];
+    char buffer[16];
 
     auto const ttl_wait = schd->params_.thread_sleep_on_idle_in_microseconds;
     auto const ttl_value = schd->params_.thread_num_tries_on_idle? schd->params_.thread_num_tries_on_idle:1;
     schd->active_threads_.fetch_add(1);
     tls()->scheduler = schd;
-    snprintf(buffer,32,"Worker-%u", id);
+    snprintf(buffer,16,"Worker-%u", id);
     schd->set_current_thread_name(buffer);
     for(;;) {
       { // wait for new activity
@@ -841,7 +833,6 @@ namespace px {
           Task *t = &schd->tasks_.get(task_ref);
           t->job();
           uint32_t counter = t->counter_id;
-          //printf("* Task %u --> %u\n", task_ref, counter);
           schd->tasks_.unref(task_ref);
           schd->unrefCounter(counter);
         }
