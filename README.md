@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/pplux/px_sched.svg?branch=master)](https://travis-ci.org/pplux/px_sched)
+[![Build Status AppVeyor](https://ci.appveyor.com/api/projects/status/github/pplux/px_sched)](https://ci.appveyor.com/project/pplux/px-sched)
 
 # px_sched
 Single Header C++ Task Scheduler 
