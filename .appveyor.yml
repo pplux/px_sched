@@ -16,4 +16,5 @@ environment:
 build_script:
   - cmd: call %CMD1%
   - cmd: call %CMD2%
-  - cmd: call examples/msbuild.bat
+  - cmd: cd examples
+  - cmd: call msbuild.bat
