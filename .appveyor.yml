@@ -13,7 +13,7 @@ environment:
       cmd1: 'call "C:\Program Files\Microsoft SDKs\Windows\v7.1\Bin\SetEnv.cmd" /x64'
       cmd2: 'call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64'
 
-test_script:
-  - cmd: $env:cmd1
-  - cmd: $env:cmd2
+build_script:
+  - cmd: %cmd1%
+  - cmd: %cmd2%
   - cmd: call examples/msbuild.bat
