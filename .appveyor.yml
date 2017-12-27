@@ -14,6 +14,6 @@ environment:
       CMD2: 'call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64'
 
 build_script:
-  - cmd: %CMD1%
-  - cmd: %CMD2%
+  - cmd: call %CMD1%
+  - cmd: call %CMD2%
   - cmd: call examples/msbuild.bat
