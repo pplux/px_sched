@@ -292,7 +292,6 @@ namespace px {
         : owner(std::this_thread::get_id())
         , ready(false) {}
       void wait() {
-        PX_SCHED_CHECK(this, "Invalid WaitFor Object");
         PX_SCHED_CHECK(std::this_thread::get_id() == owner,
             "WaitFor::wait can only be invoked from the thread "
             "that created the object");
