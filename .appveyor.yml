@@ -4,7 +4,7 @@ environment:
       CMD1: 'call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat" '
       CMD2: 'echo ....'
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
-      CMD1: 'cal "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"'
+      CMD1: 'call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"'
       CMD2: 'echo ....'
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       CMD1: 'call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86'
