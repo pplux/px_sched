@@ -637,16 +637,16 @@ namespace px {
     size_t p = 0;
     int n = 0;
     #define _ADD(...) {p += static_cast<size_t>(n); (p < buffer_size) && (n = snprintf(buffer+p, buffer_size-p,__VA_ARGS__));}
-    _ADD("CPUS:0    5    10   15   20   25   30   35   40   45   50   55   60   65   70   75\n");
-    _ADD("%4u:", active_threads_.load());
+    _ADD("CPUS   :0    5    10   15   20   25   30   35   40   45   50   55   60   65   70   75\n");
+    _ADD("%3u/%3u:", active_threads_.load(), params_.max_running_threads);
     for(size_t i = 0; i < params_.num_threads; ++i) {
       _ADD( (workers_[i].wake_up.load() == nullptr)?"*":".");
     }
-    _ADD("\nReady:   ");
+    _ADD("\nReady: ");
     for(size_t i = 0; i < ready_tasks_.in_use(); ++i) {
       _ADD("%d,",ready_tasks_.list_[i]);
     }
-    _ADD("\nTasks:   ");
+    _ADD("\nTasks: ");
     for(size_t i = 0; i < tasks_.size(); ++i) {
       uint32_t c,v;
       uint32_t hnd = tasks_.info(i, &c, &v);
@@ -703,7 +703,6 @@ namespace px {
     for(;;) {
       uint32_t active = active_threads_.load();
       if ((active >= params_.max_running_threads) ||
-          (ready_tasks_.in_use() < active) ||
           wakeUpThreads(1)) return;
     }
   }
@@ -774,13 +773,14 @@ namespace px {
   }
 
   void Scheduler::incrementSync(Sync *s) {
+    bool new_counter = false;
     if (!counters_.ref(s->hnd)) {
       s->hnd = createCounter();
+      new_counter = true;
     }
     Counter &c = counters_.get(s->hnd);
-    uint32_t prev = c.user_count.fetch_add(1);
-    // first one will leave the ref count incremented
-    if (prev != 0) {
+    c.user_count.fetch_add(1);
+    if (!new_counter) {
       unrefCounter(s->hnd);
     }
   }
