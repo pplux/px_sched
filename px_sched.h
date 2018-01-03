@@ -251,7 +251,8 @@ namespace px {
           bool expected = false;
           if (lock_.compare_exchange_strong(expected, true)) break;
         }
-        list_[in_use_] = p;
+        uint16_t pos = (current_ + in_use_)%size_;
+        list_[pos] = p;
         in_use_++;
         lock_ = false;
       }
@@ -264,14 +265,15 @@ namespace px {
         bool result = false;
         if (in_use_) {
           in_use_--;
-          if (res) *res = list_[in_use_];
+          if (res) *res = list_[current_++];
           result = true;
         }
         lock_ = false;
         return result;
       }
       uint16_t size_ = 0;
-      volatile uint16_t in_use_ = 0;
+      uint16_t in_use_ = 0;
+      uint16_t current_ = 0;
       uint32_t *list_ = nullptr;
       std::atomic<bool> lock_ = {false};
       MemCallbacks mem_;
