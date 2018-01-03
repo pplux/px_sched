@@ -251,6 +251,7 @@ namespace px {
           bool expected = false;
           if (lock_.compare_exchange_strong(expected, true)) break;
         }
+        PX_SCHED_CHECK(in_use_ < size_, "IndexQueue Overflow total in use %hu (max %hu)", in_use_, size_);
         uint16_t pos = (current_ + in_use_)%size_;
         list_[pos] = p;
         in_use_++;
@@ -264,8 +265,9 @@ namespace px {
         }
         bool result = false;
         if (in_use_) {
+          if (res) *res = list_[current_];
+          current_ = (current_+1)%size_;
           in_use_--;
-          if (res) *res = list_[current_++];
           result = true;
         }
         lock_ = false;
@@ -387,7 +389,7 @@ namespace px {
   template<class T>
   inline T& ObjectPool<T>::get(uint32_t hnd) {
     uint32_t pos = hnd & kPosMask;
-    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %u from %zu", pos, count_);
+    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %u hnd:%zu", pos, count_);
     return data_[pos].element;
   }
 
@@ -395,13 +397,13 @@ namespace px {
   template< class T>
   inline const T&  ObjectPool<T>::get(uint32_t hnd) const {
     uint32_t pos = hnd & kPosMask;
-    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %zu from %zu", pos, count_);
+    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %zu hnd:%zu", pos, count_);
     return data_[pos].element;
   }
 
   template< class T>
   inline uint32_t ObjectPool<T>::info(size_t pos, uint32_t *count, uint32_t *ver) const {
-    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %zu from %zu", pos, count_);
+    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %zu hnd:%zu", pos, count_);
     uint32_t s = data_[pos].state.load();
     if (count) *count = (s & kRefMask);
     if (ver) *ver = (s & kVerMask) >> kVerDisp;
