@@ -553,8 +553,8 @@ namespace px {
   void Scheduler::CurrentThreadSleeps() {
     TLS *d = tls();
     if (d->scheduler) {
-      d->scheduler->active_threads_.fetch_sub(1);
       d->scheduler->wakeUpOneThread();
+      d->scheduler->active_threads_.fetch_sub(1);
     }
   }
 
