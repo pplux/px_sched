@@ -47,6 +47,12 @@ namespace px {
 #endif
 // -----------------------------------------------------------------------------
 
+// Enable if you want the threads to track resource locking, this might slow
+// down things a bit.
+#ifndef PX_SCHED_CHECK_DEADLOCKS
+#define PX_SCHED_CHECK_DEADLOCKS 0
+#endif
+
 // -- Backend selection --------------------------------------------------------
 // Right now there is only two backends(single-threaded, and regular threads),
 // in the future we will add windows-fibers and posix-ucontext. Meanwhile try
@@ -217,6 +223,23 @@ namespace px {
     // call this again to notify the thread is again running
     static void CurrentThreadWakesUp();
 
+    // Call this method before locking a resource, this will be used by the
+    // scheduler to wakeup another thread as a worker, and also can be used
+    // later to detect deadlocks.
+    // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
+    static void CurrentThreadBeforeLockResource(const void *resource_ptr);
+
+    // Call this method after successfully locking a resource, this will be
+    // used to notify the scheduler that this thread can continue working.
+    // If success is true, the lock was successful, false if the thread has not
+    // blocked but also didn't adquired the lock (try_lock)
+    // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
+    static void CurrentThreadAfterLockResource(const void *resource, bool success);
+
+    // Call this method once the resouce is unlocked.
+    // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
+    static void CurrentThreadReleasesResource(const void *resource_ptr);
+
   private:
     struct TLS;
     static TLS* tls();
@@ -346,6 +369,30 @@ namespace px {
 #endif 
 
   };
+
+  //-- Optional: Mutex template to encapsultae scheduler notification ----------
+  template<class M>
+  class Mutex {
+  public:
+    void lock() {
+      Scheduler::CurrentThreadBeforeLockResource(&mutex_);
+      mutex_.lock();
+      Scheduler::CurrentThreadAfterLockResource(&mutex_, true);
+    }
+    void unlock() {
+      Scheduler::CurrentThreadReleasesResource(&mutex_);
+      mutex_.unlock();
+    }
+    bool try_lock() {
+      Scheduler::CurrentThreadBeforeLockResource(&mutex_);
+      bool result = mutex_.try_lock();
+      Scheduler::CurrentThreadAfterLockResource(&mutex_, result);
+      return result;
+    }
+  private:
+    M mutex_;
+  };
+
 
   //-- Object pool implementation ----------------------------------------------
   template<class T>
@@ -563,6 +610,31 @@ namespace px {
     if (d->scheduler) {
       d->scheduler->active_threads_.fetch_add(1);
     }
+  }
+
+  void CurrentThreadBeforeLockResource(const void *resource_ptr) {
+#if PX_SCHED_CHECK_DEADLOCKS
+    TLS *d = tls();
+#endif
+    // TODO
+    (void)resource_ptr;
+  }
+
+  void CurrentThreadAfterLockResource(const void *resource_ptr, bool success) {
+#if PX_SCHED_CHECK_DEADLOCKS
+    TLS *d = tls();
+#endif
+    // TODO
+    (void)resource_ptr;
+    (void)success;
+  }
+
+  void CurrentThreadReleasesResource(const void *resource_ptr) {
+#if PX_SCHED_CHECK_DEADLOCKS
+    TLS *d = tls();
+#endif
+    // TODO
+    (void)resource_ptr;
   }
 }
 
