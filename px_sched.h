@@ -50,7 +50,7 @@ namespace px {
 // Enable if you want the threads to track resource locking, this might slow
 // down things a bit.
 #ifndef PX_SCHED_CHECK_DEADLOCKS
-#define PX_SCHED_CHECK_DEADLOCKS 0
+#define PX_SCHED_CHECK_DEADLOCKS 1 // TODO default value should be 0
 #endif
 
 // -- Backend selection --------------------------------------------------------
@@ -347,6 +347,8 @@ namespace px {
       std::thread thread;
        // setted by the thread when is sleep
       std::atomic<WaitFor*> wake_up = {nullptr};
+      TLS *thread_tls = nullptr;
+      uint16_t thread_index = 0xFFFF;
     };
 
     struct Counter {
@@ -365,7 +367,7 @@ namespace px {
     ObjectPool<Counter> counters_;
     IndexQueue ready_tasks_;
 
-    static void WorkerThreadMain(Scheduler *schd, uint16_t id);
+    static void WorkerThreadMain(Scheduler *schd, Worker *);
 #endif 
 
   };
@@ -563,11 +565,22 @@ namespace px {
 #include <unordered_map>
 #endif
 
+#if PX_SCHED_CHECK_DEADLOCKS
+#include <vector>
+#include <algorithm>
+#endif
+
+
 namespace px {
 
   struct Scheduler::TLS {
     const char *name = nullptr;
-    Scheduler *scheduler = {nullptr};
+    Scheduler *scheduler = nullptr;
+    const void *next_lock = nullptr;
+#if PX_SCHED_CHECK_DEADLOCKS
+    std::mutex adquired_locks_m;
+    std::vector<const void*> adquired_locks;
+#endif
   };
 
   Scheduler::TLS* Scheduler::tls() {
@@ -598,43 +611,55 @@ namespace px {
   }
 
   void Scheduler::CurrentThreadSleeps() {
+    CurrentThreadBeforeLockResource(nullptr);
+  }
+
+  void Scheduler::CurrentThreadWakesUp() {
+    CurrentThreadAfterLockResource(nullptr, false);
+  }
+
+  void Scheduler::CurrentThreadBeforeLockResource(const void *resource_ptr) {
+    // if the lock might work, wake up one thread to replace this one
     TLS *d = tls();
     if (d->scheduler) {
       d->scheduler->wakeUpOneThread();
       d->scheduler->active_threads_.fetch_sub(1);
     }
+    d->next_lock = resource_ptr;
   }
 
-  void Scheduler::CurrentThreadWakesUp() {
+  void Scheduler::CurrentThreadAfterLockResource(const void *resource_ptr, bool success) {
+    // mark this thread as active (so eventually one thread will step down)
     TLS *d = tls();
     if (d->scheduler) {
       d->scheduler->active_threads_.fetch_add(1);
     }
+    PX_SCHED_CHECK(resource_ptr == d->next_lock,
+        "Resource Mistmatch between BeforeLock(%p)/AfterLock(%p)",
+        d->next_lock, resource_ptr);
+#if PX_SCHED_CHECK_DEADLOCKS
+    if (success && resource_ptr) {
+      std::lock_guard<std::mutex> l(d->adquired_locks_m);
+      d->adquired_locks.push_back(resource_ptr);
+    }
+#endif
+    d->next_lock = nullptr; // reset
   }
 
-  void CurrentThreadBeforeLockResource(const void *resource_ptr) {
+  void Scheduler::CurrentThreadReleasesResource(const void *resource_ptr) {
 #if PX_SCHED_CHECK_DEADLOCKS
     TLS *d = tls();
-#endif
-    // TODO
+    if (resource_ptr) {
+      std::lock_guard<std::mutex> l(d->adquired_locks_m);
+      auto f = std::find(d->adquired_locks.begin(), d->adquired_locks.end(), resource_ptr);
+      PX_SCHED_CHECK(f != d->adquired_locks.end(), "Can't find resource %p as adquired", resource_ptr);
+      // replace resource with last, and pop (to avoid shifting elements in the vector)
+      std::iter_swap(f, d->adquired_locks.end()--);
+      d->adquired_locks.pop_back();
+    }
+#else
     (void)resource_ptr;
-  }
-
-  void CurrentThreadAfterLockResource(const void *resource_ptr, bool success) {
-#if PX_SCHED_CHECK_DEADLOCKS
-    TLS *d = tls();
 #endif
-    // TODO
-    (void)resource_ptr;
-    (void)success;
-  }
-
-  void CurrentThreadReleasesResource(const void *resource_ptr) {
-#if PX_SCHED_CHECK_DEADLOCKS
-    TLS *d = tls();
-#endif
-    // TODO
-    (void)resource_ptr;
   }
 }
 
@@ -683,10 +708,11 @@ namespace px {
     workers_ = static_cast<Worker*>(params_.mem_callbacks.alloc_fn(sizeof(Worker)*params_.num_threads));
     for(uint16_t i = 0; i < params_.num_threads; ++i) {
       new (&workers_[i]) Worker();
+      workers_[i].thread_index = i;
     }
     PX_SCHED_CHECK(active_threads_.load() == 0, "Invalid active threads num");
     for(uint16_t i = 0; i < params_.num_threads; ++i) {
-      workers_[i].thread = std::thread(WorkerThreadMain, this, i);
+      workers_[i].thread = std::thread(WorkerThreadMain, this, &workers_[i]);
     }
   }
 
@@ -717,6 +743,17 @@ namespace px {
     _ADD("%3u/%3u:", active_threads_.load(), params_.max_running_threads);
     for(size_t i = 0; i < params_.num_threads; ++i) {
       _ADD( (workers_[i].wake_up.load() == nullptr)?"*":".");
+    }
+    _ADD("\nWorkers:\n");
+    for(size_t i = 0; i < params_.num_threads; ++i) {
+      auto &w = workers_[i];
+      std::lock_guard<std::mutex> l(w.thread_tls->adquired_locks_m);
+      _ADD("\n  Worker: %d(%s)", w.thread_index, w.thread_tls->name? w.thread_tls->name: "-no-name-");
+      _ADD("\n    AdquiredLocks:");
+      for(auto ptr:w.thread_tls->adquired_locks) {
+        _ADD("%p ",ptr);
+      }
+      _ADD("\n    Waiting For Lock: %p", w.thread_tls->next_lock);
     }
     _ADD("\nReady: ");
     for(size_t i = 0; i < ready_tasks_.in_use(); ++i) {
@@ -873,13 +910,18 @@ namespace px {
     }
   }
 
-  void Scheduler::WorkerThreadMain(Scheduler *schd, uint16_t id) {
+  void Scheduler::WorkerThreadMain(Scheduler *schd, Scheduler::Worker *worker_data) {
     char buffer[16];
+
+    const uint16_t id = worker_data->thread_index;
+    TLS *local_storage = tls();
+
+    local_storage->scheduler = schd;
+    worker_data->thread_tls = local_storage;
 
     auto const ttl_wait = schd->params_.thread_sleep_on_idle_in_microseconds;
     auto const ttl_value = schd->params_.thread_num_tries_on_idle? schd->params_.thread_num_tries_on_idle:1;
     schd->active_threads_.fetch_add(1);
-    tls()->scheduler = schd;
     snprintf(buffer,16,"Worker-%u", id);
     schd->set_current_thread_name(buffer);
     for(;;) {
@@ -914,7 +956,8 @@ namespace px {
         }
       }
     }
-    tls()->scheduler = nullptr;
+    worker_data->thread_tls = nullptr;
+    local_storage->scheduler = nullptr;
     schd->set_current_thread_name(nullptr);
   }
 } // end of px namespace
