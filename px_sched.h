@@ -654,7 +654,7 @@ namespace px {
       auto f = std::find(d->adquired_locks.begin(), d->adquired_locks.end(), resource_ptr);
       PX_SCHED_CHECK(f != d->adquired_locks.end(), "Can't find resource %p as adquired", resource_ptr);
       // replace resource with last, and pop (to avoid shifting elements in the vector)
-      std::iter_swap(f, d->adquired_locks.end()--);
+      std::swap(*f, d->adquired_locks.back());
       d->adquired_locks.pop_back();
     }
 #else
@@ -748,12 +748,22 @@ namespace px {
     for(size_t i = 0; i < params_.num_threads; ++i) {
       auto &w = workers_[i];
       std::lock_guard<std::mutex> l(w.thread_tls->adquired_locks_m);
-      _ADD("\n  Worker: %d(%s)", w.thread_index, w.thread_tls->name? w.thread_tls->name: "-no-name-");
-      _ADD("\n    AdquiredLocks:");
-      for(auto ptr:w.thread_tls->adquired_locks) {
-        _ADD("%p ",ptr);
+      bool is_on =(w.wake_up.load() == nullptr);
+      bool has_something_to_show = w.thread_tls->next_lock || w.thread_tls->adquired_locks.size();
+      if (!is_on && !has_something_to_show) {
+        continue;
       }
-      _ADD("\n    Waiting For Lock: %p", w.thread_tls->next_lock);
+      _ADD("\n  Worker: %d(%s) %s", w.thread_index, 
+          is_on?"ON":"OFF",
+          w.thread_tls->name? w.thread_tls->name: "-no-name-"
+          );
+      if (w.thread_tls->adquired_locks.size()) {
+        _ADD("\n    AdquiredLocks:");
+        for(auto ptr:w.thread_tls->adquired_locks) {
+         _ADD("%p ",ptr);
+        }
+      }
+      if (w.thread_tls->next_lock) _ADD("\n    Waiting For Lock: %p", w.thread_tls->next_lock);
     }
     _ADD("\nReady: ");
     for(size_t i = 0; i < ready_tasks_.in_use(); ++i) {
