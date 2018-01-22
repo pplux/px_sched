@@ -39,10 +39,16 @@ clean:
 	rm -f $(examples)
 
 tests: $(examples)
-	./example1 && \
-  ./example2 && \
-	./example3 && \
-	./example4 && \
-	./example5 && \
-	./example6 && \
-	echo "ALL examples executed"
+	./example1 
+	./example2 
+	./example3 
+	./example4 
+	./example5 
+	./example6 
+	./example1_deadlock_check 
+	./example2_deadlock_check 
+	./example3_deadlock_check 
+	./example4_deadlock_check 
+	./example5_deadlock_check 
+	./example6_deadlock_check 
+	@echo "ALL examples executed"

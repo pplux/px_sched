@@ -705,14 +705,12 @@ namespace px {
     if (d->scheduler) {
       d->scheduler->active_threads_.fetch_add(1);
     }
-#if PX_SCHED_CHECK_DEADLOCKS
     if (success && d->next_lock.ptr) {
+#if PX_SCHED_CHECK_DEADLOCKS
       std::lock_guard<std::mutex> l(d->adquired_locks_m);
       d->adquired_locks.push_back(d->next_lock);
-    }
-#else
-    (void)success;
 #endif
+    }
     d->next_lock = {nullptr,nullptr}; // reset
   }
 
@@ -818,13 +816,15 @@ namespace px {
     for(size_t i = 0; i < params_.num_threads; ++i) {
       _ADD( (workers_[i].wake_up.load() == nullptr)?"*":".");
     }
-#if PX_SCHED_CHECK_DEADLOCKS
     _ADD("\nWorkers(%d):", params_.num_threads);
     for(size_t i = 0; i < params_.num_threads; ++i) {
       auto &w = workers_[i];
-      std::lock_guard<std::mutex> l(w.thread_tls->adquired_locks_m);
       bool is_on =(w.wake_up.load() == nullptr);
-      bool has_something_to_show = w.thread_tls->next_lock.ptr || w.thread_tls->adquired_locks.size();
+      bool has_something_to_show = w.thread_tls->next_lock.ptr;
+#if PX_SCHED_CHECK_DEADLOCKS
+      std::lock_guard<std::mutex> l(w.thread_tls->adquired_locks_m);
+      has_something_to_show = has_something_to_show || w.thread_tls->adquired_locks.size();
+#endif
       if (!is_on && !has_something_to_show) {
         continue;
       }
@@ -832,6 +832,7 @@ namespace px {
           is_on?"ON":"OFF",
           w.thread_tls->name? w.thread_tls->name: "-no-name-"
           );
+#if PX_SCHED_CHECK_DEADLOCKS
       if (w.thread_tls->adquired_locks.size()) {
         _ADD("\n    AdquiredLocks:");
         for(auto ptr:w.thread_tls->adquired_locks) {
@@ -842,6 +843,7 @@ namespace px {
           }
         }
       }
+#endif
       if (w.thread_tls->next_lock.ptr) {
         if (w.thread_tls->next_lock.name) {
           _ADD("\n    Waiting For Lock: %p(%s)", w.thread_tls->next_lock.ptr, w.thread_tls->next_lock.name);
@@ -850,7 +852,6 @@ namespace px {
         }
       }
     }
-#endif
     _ADD("\nReady: ");
     for(size_t i = 0; i < ready_tasks_.in_use(); ++i) {
       _ADD("%d,",ready_tasks_.list_[i]);
