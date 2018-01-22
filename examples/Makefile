@@ -31,6 +31,8 @@ all: $(examples)
 
 $(examples): %: %.cpp ../px_sched.h
 	$(CXX) $(CXXFLAGS) -o $@ $(LDFLAGS) $<
+	$(CXX) $(CXXFLAGS) -DPX_SCHED_CHECK_DEADLOCKS=1 -o $@_deadlock_check $(LDFLAGS) $<
+
 
 .PHONY: clean tests
 clean:
@@ -42,4 +44,5 @@ tests: $(examples)
 	./example3 && \
 	./example4 && \
 	./example5 && \
-	./example6
+	./example6 && \
+	echo "ALL examples executed"

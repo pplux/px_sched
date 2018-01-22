@@ -50,7 +50,7 @@ namespace px {
 // Enable if you want the threads to track resource locking, this might slow
 // down things a bit.
 #ifndef PX_SCHED_CHECK_DEADLOCKS
-#define PX_SCHED_CHECK_DEADLOCKS 1 // TODO default value should be 0
+#define PX_SCHED_CHECK_DEADLOCKS 0
 #endif
 
 // -- Backend selection --------------------------------------------------------
@@ -710,6 +710,8 @@ namespace px {
       std::lock_guard<std::mutex> l(d->adquired_locks_m);
       d->adquired_locks.push_back(d->next_lock);
     }
+#else
+    (void)success;
 #endif
     d->next_lock = {nullptr,nullptr}; // reset
   }
@@ -816,6 +818,7 @@ namespace px {
     for(size_t i = 0; i < params_.num_threads; ++i) {
       _ADD( (workers_[i].wake_up.load() == nullptr)?"*":".");
     }
+#if PX_SCHED_CHECK_DEADLOCKS
     _ADD("\nWorkers(%d):", params_.num_threads);
     for(size_t i = 0; i < params_.num_threads; ++i) {
       auto &w = workers_[i];
@@ -847,6 +850,7 @@ namespace px {
         }
       }
     }
+#endif
     _ADD("\nReady: ");
     for(size_t i = 0; i < ready_tasks_.in_use(); ++i) {
       _ADD("%d,",ready_tasks_.list_[i]);
