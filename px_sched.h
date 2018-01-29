@@ -205,7 +205,10 @@ namespace px {
     void run(const Job &job, Sync *out_sync_obj = nullptr);
     void runAfter(Sync sync,const Job &job, Sync *out_sync_obj = nullptr);
     void waitFor(Sync sync); //< suspend current thread 
-    void getDebugStatus(char *buffer, size_t buffer_size) const;
+
+    // Call this only to print the internal state of the scheduler, mainly if it 
+    // stops working and want to see who is waiting for what, and so on.
+    void getDebugStatus(char *buffer, size_t buffer_size);
 
     // manually increment the value of a Sync object. Sync objects triggers
     // when they reach 0.
@@ -253,7 +256,7 @@ namespace px {
     void wakeUpOneThread();
     SchedulerParams params_;
     std::atomic<uint16_t> active_threads_;
-    bool running_ = false;
+    std::atomic<bool> running_ = {false};
 
 #ifdef PX_SCHED_IMP_REGULAR_THREADS
     struct IndexQueue {
@@ -277,22 +280,21 @@ namespace px {
         list_ = static_cast<uint32_t*>(mem_.alloc_fn(sizeof(uint32_t)*size_));
       }
       void push(uint32_t p) {
-        for(;;) {
-          bool expected = false;
-          if (lock_.compare_exchange_strong(expected, true)) break;
-        }
+        _lock();
         PX_SCHED_CHECK(in_use_ < size_, "IndexQueue Overflow total in use %hu (max %hu)", in_use_, size_);
         uint16_t pos = (current_ + in_use_)%size_;
         list_[pos] = p;
         in_use_++;
-        lock_ = false;
+        _unlock();
       }
-      uint16_t in_use() const { return in_use_; }
+      uint16_t in_use() {
+        _lock();
+        uint16_t result = in_use_;
+        _unlock();
+        return result;
+      }
       bool pop(uint32_t *res) {
-       for(;;) {
-          bool expected = false;
-          if (lock_.compare_exchange_strong(expected, true)) break;
-        }
+        _lock();
         bool result = false;
         if (in_use_) {
           if (res) *res = list_[current_];
@@ -300,12 +302,19 @@ namespace px {
           in_use_--;
           result = true;
         }
-        lock_ = false;
+        _unlock();
         return result;
       }
-      uint16_t size_ = 0;
-      uint16_t in_use_ = 0;
-      uint16_t current_ = 0;
+      void _unlock() { lock_ = false; }
+      void _lock() {
+       for(;;) {
+          bool expected = false;
+          if (lock_.compare_exchange_strong(expected, true)) break;
+        }
+      }
+      volatile uint16_t size_ = 0;
+      volatile uint16_t in_use_ = 0;
+      volatile uint16_t current_ = 0;
       uint32_t *list_ = nullptr;
       std::atomic<bool> lock_ = {false};
       MemCallbacks mem_;
@@ -478,7 +487,6 @@ namespace px {
   
   template<class T>
   void ObjectPool<T>::newElement(uint32_t pos) const {
-    memset(&data_[pos].element, 0, sizeof(T));
     new (&data_[pos].element) T;
   }
 
@@ -815,7 +823,7 @@ namespace px {
     }
   }
   
-  void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) const {
+  void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) {
     size_t p = 0;
     int n = 0;
     #define _ADD(...) {p += static_cast<size_t>(n); (p < buffer_size) && (n = snprintf(buffer+p, buffer_size-p,__VA_ARGS__));}
@@ -861,7 +869,7 @@ namespace px {
       }
     }
     _ADD("\nReady: ");
-    for(size_t i = 0; i < ready_tasks_.in_use(); ++i) {
+    for(size_t i = 0; i < ready_tasks_.in_use_; ++i) {
       _ADD("%d,",ready_tasks_.list_[i]);
     }
     _ADD("\nTasks: ");

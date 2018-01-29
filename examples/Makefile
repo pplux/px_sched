@@ -1,4 +1,5 @@
-CXXFLAGS=-std=c++11 -pedantic \
+#Note, no-pie is enabled due a bug in tsan...
+CXXFLAGS=-std=c++11 -pedantic -fsanitize=thread -ltsan -no-pie -g -O2\
 	-Wall \
 	-Wcast-align \
 	-Wcast-qual \
