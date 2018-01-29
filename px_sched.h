@@ -47,12 +47,6 @@ namespace px {
 #endif
 // -----------------------------------------------------------------------------
 
-// Enable if you want the threads to track resource locking, this might slow
-// down things a bit.
-#ifndef PX_SCHED_CHECK_DEADLOCKS
-#define PX_SCHED_CHECK_DEADLOCKS 0
-#endif
-
 // -- Backend selection --------------------------------------------------------
 // Right now there is only two backends(single-threaded, and regular threads),
 // in the future we will add windows-fibers and posix-ucontext. Meanwhile try
@@ -80,8 +74,18 @@ namespace px {
     ) != 1
 #error "PX_SCHED: Only one backend must be enabled (and at least one)"
 #endif
-
 // -----------------------------------------------------------------------------
+
+// Enable if you want the threads to track resource locking, this might slow
+// down things a bit.
+#ifndef PX_SCHED_CHECK_DEADLOCKS
+#define PX_SCHED_CHECK_DEADLOCKS 0
+#endif
+
+#ifndef PX_SCHED_CACHE_LINE_SIZE
+#define PX_SCHED_CACHE_LINE_SIZE 64
+#endif
+
 
 // some checks, can be ommited if you're confident there is no
 // missuse of the library.
@@ -175,10 +179,13 @@ namespace px {
     void newElement(uint32_t pos) const;
     void deleteElement(uint32_t pos) const;
     struct D {
-      T element;
       mutable std::atomic<uint32_t> state = {0};
+      T element;
       uint32_t version = 0;
-      char padding[64]; // Avoid false sharing between threads
+#if PX_SCHED_CACHE_LINE_SIZE
+      // Avoid false sharing between threads
+      char padding[PX_SCHED_CACHE_LINE_SIZE];
+#endif
     };
     D *data_ = nullptr;
     std::atomic<uint32_t> next_;
@@ -310,8 +317,8 @@ namespace px {
 
     struct Task {
       Job job;
-      uint32_t counter_id;
-      std::atomic<uint32_t> next_sibling_task;
+      uint32_t counter_id = 0;
+      std::atomic<uint32_t> next_sibling_task = {0};
     };
 
     struct WaitFor {
@@ -471,7 +478,8 @@ namespace px {
   
   template<class T>
   void ObjectPool<T>::newElement(uint32_t pos) const {
-    new (&data_[pos].element) T();
+    memset(&data_[pos].element, 0, sizeof(T));
+    new (&data_[pos].element) T;
   }
 
   template<class T>
