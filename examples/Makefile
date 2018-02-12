@@ -27,7 +27,7 @@ ifeq ($(UNAME_S),Linux)
   LDFLAGS += -lpthread
 endif
 
-examples = example1 example2 example3 example4 example5 example6
+examples = example1 example2 example3 example4 example5 example6 example7
 all: $(examples)
 
 $(examples): %: %.cpp ../px_sched.h

@@ -250,6 +250,8 @@ namespace px {
     // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
     static void CurrentThreadReleasesResource(const void *resource_ptr);
 
+    const SchedulerParams& params() const { return params_; }
+
   private:
     struct TLS;
     static TLS* tls();
