@@ -26,7 +26,7 @@ CXXFLAGS=-std=c++11 -pedantic -g -O2\
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
   LDFLAGS += -lpthread
-  CXXFLAGS += -fsanitize=thread -ltsan
+  CXXFLAGS += -fsanitize=thread -ltsan -pie
 endif
 
 examples = example1 example2 example3 example4 example5 example6 example7

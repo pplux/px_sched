@@ -86,7 +86,7 @@ int main(int, char **) {
   MRSW<Example> example;
   example.init(&sched_);
 
-  for(uint32_t i = 0; i < 8000; ++i) {
+  for(uint32_t i = 0; i < 1000; ++i) {
     if ((std::rand() & 0xFF) < 200) {
       example.executeRead([i](const Example *e) {
         e->readers.fetch_add(1);
