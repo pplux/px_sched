@@ -801,10 +801,10 @@ namespace px {
 
   Scheduler::~Scheduler() { stop(); }
 
-  void Scheduler::init(const SchedulerParams &params) {
+  void Scheduler::init(const SchedulerParams &_params) {
     stop();
     running_ = true;
-    params_ = params;
+    params_ = _params;
     if (params_.max_running_threads == 0) {
       params_.max_running_threads = std::thread::hardware_concurrency();
     }
