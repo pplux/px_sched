@@ -22,11 +22,15 @@ CXXFLAGS=-std=c++11 -pedantic -g -O2\
 	-Wswitch-default \
 	-Wundef \
 
-
 UNAME_S := $(shell uname -s)
+
+
 ifeq ($(UNAME_S),Linux)
-  LDFLAGS += -lpthread -ltsan 
-  CXXFLAGS += -fsanitize=thread -pie -fPIE
+  LDFLAGS += -lpthread
+  ifeq ($(config),tsan)
+    LDFLAGS += -ltsan
+    CXXFLAGS += -fsanitize=thread -pie -fPIE
+  endif
 endif
 
 examples = example1 example2 example3 example4 example5 example6 example7
