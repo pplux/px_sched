@@ -19,6 +19,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ----------------------------------------------------------------------------- */
 
+// USAGE
+// Include this file in any file it needs to refer to it, but if you need
+// to change any define, or use a custom job description is preferable to
+// create a header that sets the defines, defines the job description and
+// finally includes this file.
+//
+// In *ONE* C++ file you need to declare
+// #define PX_SCHED_IMPLEMENTATION 1
+// beefore including the file that contains px_sched.h
+
 #ifndef PX_SCHED
 #define PX_SCHED
 
@@ -641,8 +651,16 @@ namespace px {
 
 
 } // end of px namespace
+#endif // PX_SCHED
+
+//----------------------------------------------------------------------------
+// -- IMPLEMENTATION ---------------------------------------------------------
+//----------------------------------------------------------------------------
 
 #ifdef PX_SCHED_IMPLEMENTATION
+
+#ifndef PX_SCHED_IMPLEMENTATION_DONE
+#define PX_SCHED_IMPLEMENTATION_DONE 1
 
 #ifdef PX_SCHED_ATLERNATIVE_TLS
 // used to store custom TLS... some platfor might have problems with
@@ -1078,5 +1096,6 @@ namespace px {
 } // end of px namespace
 #endif // PX_SCHED_IMP_REGULAR_THREADS
 
+#endif // PX_SCHED_IMPLEMENTATION_DONE
+
 #endif // PX_SCHED_IMPLEMENTATION
-#endif // PX_SCHED

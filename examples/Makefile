@@ -1,5 +1,6 @@
 #Note, no-pie is enabled due a bug in tsan...
-CXXFLAGS=-std=c++11 -pedantic -fsanitize=thread -ltsan -no-pie -g -O2\
+
+CXXFLAGS=-std=c++11 -pedantic -g -O2\
 	-Wall \
 	-Wcast-align \
 	-Wcast-qual \
@@ -22,9 +23,11 @@ CXXFLAGS=-std=c++11 -pedantic -fsanitize=thread -ltsan -no-pie -g -O2\
 	-Wswitch-default \
 	-Wundef \
 
+
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
   LDFLAGS += -lpthread
+  CXXFLAGS += -fsanitize=thread -ltsan -no-pie
 endif
 
 examples = example1 example2 example3 example4 example5 example6 example7
@@ -32,8 +35,6 @@ all: $(examples)
 
 $(examples): %: %.cpp ../px_sched.h
 	$(CXX) $(CXXFLAGS) -o $@ $(LDFLAGS) $<
-	$(CXX) $(CXXFLAGS) -DPX_SCHED_CHECK_DEADLOCKS=1 -o $@_deadlock_check $(LDFLAGS) $<
-
 
 .PHONY: clean tests
 clean:
@@ -46,10 +47,5 @@ tests: $(examples)
 	./example4 
 	./example5 
 	./example6 
-	./example1_deadlock_check 
-	./example2_deadlock_check 
-	./example3_deadlock_check 
-	./example4_deadlock_check 
-	./example5_deadlock_check 
-	./example6_deadlock_check 
+	./example7
 	@echo "ALL examples executed"
