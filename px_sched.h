@@ -185,6 +185,8 @@ namespace px {
     // returns true if the given position was a valid object
     bool ref(uint32_t hnd) const;
 
+    uint32_t refCount(uint32_t hnd) const;
+
   private:
     void newElement(uint32_t pos) const;
     void deleteElement(uint32_t pos) const;
@@ -216,6 +218,13 @@ namespace px {
     void runAfter(Sync sync,const Job &job, Sync *out_sync_obj = nullptr);
     void waitFor(Sync sync); //< suspend current thread 
 
+    // returns the number of tasks not yet finished associated to the sync object
+    // thus 0 means all of them has finished (or the sync object was empty, or
+    // unused)
+    uint32_t numPendingTasks(Sync s);
+
+    bool hasFinished(Sync s) { return numPendingTasks(s) == 0; }
+  
     // Call this only to print the internal state of the scheduler, mainly if it 
     // stops working and want to see who is waiting for what, and so on.
     void getDebugStatus(char *buffer, size_t buffer_size);
@@ -649,6 +658,17 @@ namespace px {
     }
   }
 
+  template< class T>
+  inline uint32_t ObjectPool<T>::refCount(uint32_t hnd) const{
+    if (!hnd) return 0;
+    uint32_t pos = hnd & kPosMask;
+    uint32_t ver = (hnd & kVerMask);
+    D& d = data_[pos];
+    uint32_t current = d.state.load();
+    if ((current & kVerMask) != ver ) return 0;
+    return (current & kRefMask);
+  }
+
 
 } // end of px namespace
 #endif // PX_SCHED
@@ -782,6 +802,7 @@ namespace px {
   void Scheduler::run(const Job &job, Sync *) { Job j(job); j(); }
   void Scheduler::runAfter(Sync s, const Job &job, Sync *) { Job j(job); j();}
   void Scheduler::waitFor(Sync) {}
+  uint32_t Scheduler::numPendingTasks(Sync){ returns 0; }
   void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) const {
     if (buffer_size) buffer[0] = 0;
   }
@@ -993,6 +1014,10 @@ namespace px {
       wf.wait();
       CurrentThreadWakesUp(); 
     }
+  }
+
+  uint32_t Scheduler::numPendingTasks(Sync s) {
+    return counters_.refCount(s.hnd);
   }
 
   void Scheduler::unrefCounter(uint32_t hnd) {
