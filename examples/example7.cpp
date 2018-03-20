@@ -5,6 +5,7 @@
 #include <cstdlib> // demo: rand 
 #include <mutex> // for the scoped lock
 
+//#define PX_SCHED_CONFIG_SINGLE_THREAD 1
 #define PX_SCHED_IMPLEMENTATION 1
 #include "../px_sched.h"
 #include "mem_check.h"
@@ -63,10 +64,10 @@ public:
 private:
   px::Scheduler *sched_ = nullptr;
   T *obj_ = nullptr;
-  bool read_mode_;
   px::Sync prev_;
   px::Sync next_;
   px::Spinlock lock_;
+  bool read_mode_;
 };
 
 struct Example {

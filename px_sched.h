@@ -192,8 +192,8 @@ namespace px {
     void deleteElement(uint32_t pos) const;
     struct D {
       mutable std::atomic<uint32_t> state = {0};
-      T element;
       uint32_t version = 0;
+      T element;
 #if PX_SCHED_CACHE_LINE_SIZE
       // Avoid false sharing between threads
       char padding[PX_SCHED_CACHE_LINE_SIZE];
@@ -683,8 +683,8 @@ namespace px {
 #define PX_SCHED_IMPLEMENTATION_DONE 1
 
 #ifdef PX_SCHED_ATLERNATIVE_TLS
-// used to store custom TLS... some platfor might have problems with
-// TLS (iOS usted to be one)
+// used to store custom TLS... some platform might have problems with
+// TLS (iOS used to be one)
 #include <unordered_map>
 #endif
 
@@ -800,14 +800,14 @@ namespace px {
   void Scheduler::init(const SchedulerParams &) {}
   void Scheduler::stop() {}
   void Scheduler::run(const Job &job, Sync *) { Job j(job); j(); }
-  void Scheduler::runAfter(Sync s, const Job &job, Sync *) { Job j(job); j();}
+  void Scheduler::runAfter(Sync, const Job &job, Sync *) { Job j(job); j();}
   void Scheduler::waitFor(Sync) {}
-  uint32_t Scheduler::numPendingTasks(Sync){ returns 0; }
-  void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) const {
+  uint32_t Scheduler::numPendingTasks(Sync){ return 0; }
+  void Scheduler::getDebugStatus(char *buffer, size_t buffer_size) {
     if (buffer_size) buffer[0] = 0;
   }
-  void Scheduler::incrementSync(Sync *s) {}
-  void Scheduler::decrementSync(Sync *s) {}
+  void Scheduler::incrementSync(Sync *) {}
+  void Scheduler::decrementSync(Sync *) {}
   void Scheduler::wakeUpOneThread() {}
 } // end of px namespace
 #endif // PX_SCHED_IMP_SINGLE_THREAD
@@ -827,7 +827,7 @@ namespace px {
     running_ = true;
     params_ = _params;
     if (params_.max_running_threads == 0) {
-      params_.max_running_threads = std::thread::hardware_concurrency();
+      params_.max_running_threads = (uint16_t)std::thread::hardware_concurrency();
     }
     // create tasks
     tasks_.init(params_.max_number_tasks, params_.mem_callbacks);
