@@ -271,6 +271,9 @@ namespace px {
 
     const SchedulerParams& params() const { return params_; }
 
+    // Number of active threads (executing tasks)
+    uint32_t active_threads() const { return active_threads_.load(); }
+
   private:
     struct TLS;
     static TLS* tls();
