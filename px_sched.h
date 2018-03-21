@@ -827,7 +827,7 @@ namespace px {
     running_ = true;
     params_ = _params;
     if (params_.max_running_threads == 0) {
-      params_.max_running_threads = (uint16_t)std::thread::hardware_concurrency();
+      params_.max_running_threads = static_cast<uint16_t>(std::thread::hardware_concurrency());
     }
     // create tasks
     tasks_.init(params_.max_number_tasks, params_.mem_callbacks);
