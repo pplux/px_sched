@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-Copyright (c) 2017 Jose L. Hidalgo (PpluX)
+Copyright (c) 2017-2018 Jose L. Hidalgo (PpluX)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -276,8 +276,8 @@ namespace px {
     static TLS* tls();
     void wakeUpOneThread();
     SchedulerParams params_;
-    std::atomic<uint16_t> active_threads_;
-    std::atomic<bool> running_ = {false};
+    std::atomic<uint32_t> active_threads_;
+    std::atomic<uint32_t> running_ = {0};
 
 #ifdef PX_SCHED_IMP_REGULAR_THREADS
     struct IndexQueue {
@@ -326,19 +326,19 @@ namespace px {
         _unlock();
         return result;
       }
-      void _unlock() { lock_ = false; }
+      void _unlock() { lock_ = 0; }
       void _lock() {
        for(;;) {
-          bool expected = false;
-          if (lock_.compare_exchange_strong(expected, true)) break;
+          uint32_t expected = 0;
+          if (lock_.compare_exchange_weak(expected, 1)) break;
         }
       }
+      uint32_t *list_ = nullptr;
+      std::atomic<uint32_t> lock_ = {0};
+      MemCallbacks mem_;
       volatile uint16_t size_ = 0;
       volatile uint16_t in_use_ = 0;
       volatile uint16_t current_ = 0;
-      uint32_t *list_ = nullptr;
-      std::atomic<bool> lock_ = {false};
-      MemCallbacks mem_;
     };
 
     struct Counter;
@@ -713,10 +713,10 @@ namespace px {
   Scheduler::TLS* Scheduler::tls() {
 #ifdef PX_SCHED_ATLERNATIVE_TLS
     static std::unordered_map<std::thread::id, TLS> data;
-    static std::atomic<bool> in_use = {false};
+    static std::atomic<uint32_t> in_use = {0};
     for(;;) {
-      bool expected = false;
-      if (in_use.compare_exchange_weak(expected, true)) break;
+      uint32_t expected = 0;
+      if (in_use.compare_exchange_weak(expected, 1)) break;
     }
     auto result = &data[std::this_thread::get_id()];
     in_use = false;
