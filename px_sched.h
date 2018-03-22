@@ -332,7 +332,9 @@ namespace px {
       }
       void _unlock() { lock_.clear(std::memory_order_release); }
       void _lock() {
-        while(lock_.test_and_set(std::memory_order_acquire));
+        while(lock_.test_and_set(std::memory_order_acquire)) {
+          std::this_thread::yield();
+        }
       }
       uint32_t *list_ = nullptr;
       std::atomic_flag lock_ = ATOMIC_FLAG_INIT;
