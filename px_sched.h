@@ -296,12 +296,13 @@ namespace px {
         in_use_ = 0;
       }
       void init(uint16_t max, const MemCallbacks &mem_cb = MemCallbacks()) {
+        _lock();
         reset();
         mem_ = mem_cb;
         size_ = max;
         in_use_ = 0;
-        lock_ = false;
         list_ = static_cast<uint32_t*>(mem_.alloc_fn(sizeof(uint32_t)*size_));
+        _unlock();
       }
       void push(uint32_t p) {
         _lock();
@@ -329,15 +330,12 @@ namespace px {
         _unlock();
         return result;
       }
-      void _unlock() { lock_ = 0; }
+      void _unlock() { lock_.clear(std::memory_order_release); }
       void _lock() {
-       for(;;) {
-          uint32_t expected = 0;
-          if (lock_.compare_exchange_weak(expected, 1)) break;
-        }
+        while(lock_.test_and_set(std::memory_order_acquire));
       }
       uint32_t *list_ = nullptr;
-      std::atomic<uint32_t> lock_ = {0};
+      std::atomic_flag lock_ = ATOMIC_FLAG_INIT;
       MemCallbacks mem_;
       volatile uint16_t size_ = 0;
       volatile uint16_t in_use_ = 0;
