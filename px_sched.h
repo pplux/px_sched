@@ -956,15 +956,19 @@ namespace px {
   }
 
   uint16_t Scheduler::wakeUpThreads(uint16_t max_num_threads) {
-    uint16_t woken_up = 0;
-    for(uint32_t i = 0; (i < params_.num_threads) && (woken_up < max_num_threads); ++i) {
+    uint16_t total_woken_up = 0;
+    for(uint32_t i = 0; (i < params_.num_threads) && (total_woken_up < max_num_threads); ++i) {
       WaitFor *wake_up = workers_[i].wake_up.exchange(nullptr);
       if (wake_up) {
         wake_up->signal();
-        woken_up++;
+        total_woken_up++;
+        // Add one to the total active threads, for later substracting it, this
+        // will take the thread as awake before the thread actually is again working
+        active_threads_.fetch_add(1);
       }
     }
-    return woken_up;
+    active_threads_.fetch_sub(total_woken_up);
+    return total_woken_up;
   }
 
   void Scheduler::wakeUpOneThread() {
