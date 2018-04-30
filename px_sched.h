@@ -254,19 +254,17 @@ namespace px {
 
     // Call this method before locking a resource, this will be used by the
     // scheduler to wakeup another thread as a worker, and also can be used
-    // later to detect deadlocks.
-    // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
+    // later to detect deadlocks (if compiled with PX_SCHED_CHECK_DEADLOCKS 1,
+    // WIP!)
     static void CurrentThreadBeforeLockResource(const void *resource_ptr, const char *name = nullptr);
 
-    // Call this method after successfully locking a resource, this will be
+    // Call this method after calling CurrentThreadBeforeLockResource, this will be
     // used to notify the scheduler that this thread can continue working.
-    // If success is true, the lock was successful, false if the thread has not
+    // If success is true, the lock was successful, false if the thread was not
     // blocked but also didn't adquired the lock (try_lock)
-    // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
     static void CurrentThreadAfterLockResource(bool success);
 
     // Call this method once the resouce is unlocked.
-    // * it only works if was compiled with PX_SCHED_CHECK_DEADLOCKS 1
     static void CurrentThreadReleasesResource(const void *resource_ptr);
 
     const SchedulerParams& params() const { return params_; }
@@ -752,8 +750,8 @@ namespace px {
     // if the lock might work, wake up one thread to replace this one
     TLS *d = tls();
     if (d->scheduler) {
-      d->scheduler->wakeUpOneThread();
       d->scheduler->active_threads_.fetch_sub(1);
+      d->scheduler->wakeUpOneThread();
     }
     d->next_lock = {resource_ptr, name};
   }
