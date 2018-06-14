@@ -7,29 +7,29 @@
 
 int main(int, char **) {
   atexit(mem_report);
-  px::Scheduler schd;
-  px::SchedulerParams s_params;
+  px_sched::Scheduler schd;
+  px_sched::SchedulerParams s_params;
   s_params.mem_callbacks.alloc_fn = mem_check_alloc;
   s_params.mem_callbacks.free_fn = mem_check_free;
   schd.init(s_params);
 
-  px::Sync s;
+  px_sched::Sync s;
   for(size_t i = 0; i < 10; ++i) {
     auto job = [i] {
       printf("Phase 1: Task %zu completed from %s\n",
-       i, px::Scheduler::current_thread_name());
+       i, px_sched::Scheduler::current_thread_name());
     };
     schd.run(job, &s);
   }
 
-  px::Sync last;
+  px_sched::Sync last;
   schd.runAfter(s, [&schd]{
     printf("Phase 2\n");
-    px::Sync s2;
+    px_sched::Sync s2;
     for(size_t i = 0; i < 10; ++i) {
       auto job = [i] {
         printf("Phase 2: Task %zu completed from %s\n",
-         i, px::Scheduler::current_thread_name());
+         i, px_sched::Scheduler::current_thread_name());
       };
       schd.run(job, &s2);
     }

@@ -5,16 +5,16 @@
 #include "../px_sched.h"
 
 int main(int, char **) {
-  px::Scheduler schd;
+  px_sched::Scheduler schd;
   schd.init();
 
-  px::Sync s;
+  px_sched::Sync s;
   for(size_t i = 0; i < 128; ++i) {
     auto job = [i] {
       printf("Task %zu completed from %s\n",
-       i, px::Scheduler::current_thread_name());
+       i, px_sched::Scheduler::current_thread_name());
     };
-    px::Sync new_s;
+    px_sched::Sync new_s;
     // run job after s
     schd.runAfter(s, job, &new_s);
     // sync objects can be copied, store the new sync object for the next task

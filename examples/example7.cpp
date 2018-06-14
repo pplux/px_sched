@@ -16,7 +16,7 @@ class MRSW {
 public:
   ~MRSW() { finish(); }
 
-  void init(px::Scheduler *s) {
+  void init(px_sched::Scheduler *s) {
     finish();
     sched_ = s;
     void *ptr = sched_->params().mem_callbacks.alloc_fn(sizeof(T));
@@ -35,12 +35,12 @@ public:
   }
 
   template<class T_func>
-  void executeRead(T_func func, px::Sync *finish_signal = nullptr) {
-    std::lock_guard<px::Spinlock> g(lock_);
+  void executeRead(T_func func, px_sched::Sync *finish_signal = nullptr) {
+    std::lock_guard<px_sched::Spinlock> g(lock_);
     if (!read_mode_) {
       read_mode_ = true;
       prev_ = next_;
-      next_ = px::Sync();
+      next_ = px_sched::Sync();
     }
     if (finish_signal) sched_->incrementSync(finish_signal);
     sched_->runAfter(prev_, [this, func, finish_signal]() {
@@ -50,10 +50,10 @@ public:
   }
 
   template<class T_func>
-  void executeWrite(T_func func, px::Sync *finish_signal = nullptr) {
-    std::lock_guard<px::Spinlock> g(lock_);
+  void executeWrite(T_func func, px_sched::Sync *finish_signal = nullptr) {
+    std::lock_guard<px_sched::Spinlock> g(lock_);
     read_mode_ = false;
-    px::Sync new_next;
+    px_sched::Sync new_next;
     if (finish_signal) sched_->incrementSync(finish_signal);
     sched_->runAfter(next_, [this, func, finish_signal]() {
       func(obj_);
@@ -62,11 +62,11 @@ public:
     next_ = new_next;
   }
 private:
-  px::Scheduler *sched_ = nullptr;
+  px_sched::Scheduler *sched_ = nullptr;
   T *obj_ = nullptr;
-  px::Sync prev_;
-  px::Sync next_;
-  px::Spinlock lock_;
+  px_sched::Sync prev_;
+  px_sched::Sync next_;
+  px_sched::Spinlock lock_;
   bool read_mode_;
 };
 
@@ -77,8 +77,8 @@ struct Example {
 
 int main(int, char **) {
   atexit(mem_report);
-  px::Scheduler sched_;
-  px::SchedulerParams s_params;
+  px_sched::Scheduler sched_;
+  px_sched::SchedulerParams s_params;
   s_params.max_number_tasks = 8196;
   s_params.mem_callbacks.alloc_fn = mem_check_alloc;
   s_params.mem_callbacks.free_fn = mem_check_free;

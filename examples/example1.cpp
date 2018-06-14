@@ -5,15 +5,15 @@
 #include "../px_sched.h"
 
 int main(int, char **) {
-  px::Scheduler schd;
+  px_sched::Scheduler schd;
   schd.init();
 
   // (a) Sync objects can be used later to wait for them
-  px::Sync s;
+  px_sched::Sync s;
   for(size_t i = 0; i < 128; ++i) {
     auto job = [i] {
       printf("Task %zu completed from %s\n",
-       i, px::Scheduler::current_thread_name());
+       i, px_sched::Scheduler::current_thread_name());
     };
     // run a task, and notify to the given sync object
     schd.run(job, &s);

@@ -34,12 +34,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // -- Job Object ----------------------------------------------------------
 // if you want to use your own job objects, define the following
-// macro and provide a struct px::Job object with an operator() method.
+// macro and provide a struct px_sched::Job object with an operator() method.
 //
 // Example, a C-like pointer to function:
 //
 //    #define PX_SCHED_CUSTOM_JOB_DEFINITION
-//    namespace px {
+//    namespace px_sched {
 //      struct Job {
 //        void (*func)(void *arg);
 //        void *arg;
@@ -51,7 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 #ifndef PX_SCHED_CUSTOM_JOB_DEFINITION
 #include <functional>
-namespace px {
+namespace px_sched {
   typedef std::function<void()> Job;
 } // px namespace
 #endif
@@ -98,7 +98,7 @@ namespace px {
 
 
 // some checks, can be ommited if you're confident there is no
-// missuse of the library.
+// misuse of the library.
 #ifndef PX_SCHED_CHECK
 #  include <cstdlib>
 #  include <cstdio>
@@ -117,7 +117,7 @@ namespace px {
 #include <condition_variable>
 #include <thread>
 
-namespace px {
+namespace px_sched {
 
   // Sync object
   class Sync {
@@ -171,7 +171,7 @@ namespace px {
     // max number of elements hold by the object pool
     uint32_t size() const { return count_; }
 
-    // retunrs the handler of an object in the pool that can be used
+    // returns the handler of an object in the pool that can be used
     // it also increments in one the number of references (no need to call ref)
     uint32_t adquireAndRef();
 
@@ -695,7 +695,7 @@ namespace px {
 #endif
 
 
-namespace px {
+namespace px_sched {
 
   struct Scheduler::TLS {
     const char *name = nullptr;
@@ -816,7 +816,7 @@ namespace px {
 #if PX_SCHED_IMP_REGULAR_THREADS
 // Default implementation using threads 
 #include <thread>
-namespace px {
+namespace px_sched {
   Scheduler::Scheduler() {
     active_threads_ = 0;
   }
@@ -1123,7 +1123,7 @@ namespace px {
     local_storage->scheduler = nullptr;
     schd->set_current_thread_name(nullptr);
   }
-} // end of px namespace
+} // end of px_sched namespace
 #endif // PX_SCHED_IMP_REGULAR_THREADS
 
 #endif // PX_SCHED_IMPLEMENTATION_DONE
