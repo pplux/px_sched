@@ -86,32 +86,47 @@ namespace px_sched {
 #endif
 // -----------------------------------------------------------------------------
 
+#ifndef PX_SCHED_CACHE_LINE_SIZE
+#define PX_SCHED_CACHE_LINE_SIZE 64
+#endif
+
+// **WARNING** ---> WORK IN PROGRESS <--- **WARNING** 
 // Enable if you want the threads to track resource locking, this might slow
 // down things a bit.
 #ifndef PX_SCHED_CHECK_DEADLOCKS
 #define PX_SCHED_CHECK_DEADLOCKS 0
 #endif
+// -----------------------------------------------------------------------------
 
-#ifndef PX_SCHED_CACHE_LINE_SIZE
-#define PX_SCHED_CACHE_LINE_SIZE 64
+
+// some checks, can be omitted if you're confident there is no
+// misuse of the library. 
+#ifndef PX_SCHED_DOES_CHECKS
+#define PX_SCHED_DOES_CHECKS 1
 #endif
 
-
-// some checks, can be ommited if you're confident there is no
-// misuse of the library.
-#ifndef PX_SCHED_CHECK
-#  include <cstdlib>
-#  include <cstdio>
-#  define PX_SCHED_CHECK(cond, ...) \
-      if (!(cond)) { \
-        printf("-- PX_SCHED ERROR: -------------------\n"); \
-        printf("-- %s:%d\n", __FILE__, __LINE__); \
-        printf("--------------------------------------\n"); \
-        printf(__VA_ARGS__);\
-        printf("\n--------------------------------------\n"); \
-        abort(); \
-      } 
-#endif
+// PX_SCHED_CHECK_FN -----------------------------------------------------------
+// used to check conditions, to test for erros
+// defined only if PX_SCHED_DOES_CHECKS is evaluated to true. By 
+// default uses printf and abort, use your own implementation by defining
+// PX_SCHED_CHECK_FN before including this header.
+#ifndef PX_SCHED_CHECK_FN
+#  if PX_SCHED_DOES_CHECKS
+#    include <cstdlib>
+#    include <cstdio>
+#    define PX_SCHED_CHECK_FN(cond, ...) \
+        if (!(cond)) { \
+          printf("-- PX_SCHED ERROR: -------------------\n"); \
+          printf("-- %s:%d\n", __FILE__, __LINE__); \
+          printf("--------------------------------------\n"); \
+          printf(__VA_ARGS__);\
+          printf("\n--------------------------------------\n"); \
+          abort(); \
+        } 
+#  else
+#    define PX_SCHED_CHECK_FN(...) /*NO CHECK*/
+#  endif // PX_SCHED_DOES_CHECKS
+#endif // PX_SCHED_CHECK_FN
 
 #include <atomic>
 #include <condition_variable>
@@ -283,7 +298,7 @@ namespace px_sched {
 #ifdef PX_SCHED_IMP_REGULAR_THREADS
     struct IndexQueue {
       ~IndexQueue() {
-        PX_SCHED_CHECK(list_ == nullptr, "IndexQueue Resources leaked...");
+        PX_SCHED_CHECK_FN(list_ == nullptr, "IndexQueue Resources leaked...");
       }
       void reset() {
         if (list_) {
@@ -304,7 +319,7 @@ namespace px_sched {
       }
       void push(uint32_t p) {
         _lock();
-        PX_SCHED_CHECK(in_use_ < size_, "IndexQueue Overflow total in use %hu (max %hu)", in_use_, size_);
+        PX_SCHED_CHECK_FN(in_use_ < size_, "IndexQueue Overflow total in use %hu (max %hu)", in_use_, size_);
         uint16_t pos = (current_ + in_use_)%size_;
         list_[pos] = p;
         in_use_++;
@@ -357,7 +372,7 @@ namespace px_sched {
         : owner(std::this_thread::get_id())
         , ready(false) {}
       void wait() {
-        PX_SCHED_CHECK(std::this_thread::get_id() == owner,
+        PX_SCHED_CHECK_FN(std::this_thread::get_id() == owner,
             "WaitFor::wait can only be invoked from the thread "
             "that created the object");
         std::unique_lock<std::mutex> lk(mutex);
@@ -431,7 +446,7 @@ namespace px_sched {
     }
     void unlock() {
       std::thread::id tid = std::this_thread::get_id();
-      PX_SCHED_CHECK(owner_ == tid, "Invalid Mutex::unlock owner mistmatch");
+      PX_SCHED_CHECK_FN(owner_ == tid, "Invalid Mutex::unlock owner mistmatch");
       count_--;
       if (count_ == 0) {
         owner_ = std::thread::id();
@@ -476,7 +491,7 @@ namespace px_sched {
 
     void unlock() {
       std::thread::id tid = std::this_thread::get_id();
-      PX_SCHED_CHECK(owner_ == tid, "Invalid Spinlock::unlock owner mistmatch");
+      PX_SCHED_CHECK_FN(owner_ == tid, "Invalid Spinlock::unlock owner mistmatch");
       count_--;
       if (count_ == 0) {
         owner_ = std::thread::id();
@@ -543,7 +558,7 @@ namespace px_sched {
   template<class T>
   inline T& ObjectPool<T>::get(uint32_t hnd) {
     uint32_t pos = hnd & kPosMask;
-    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %u hnd:%zu", pos, count_);
+    PX_SCHED_CHECK_FN(pos < count_, "Invalid access to pos %u hnd:%zu", pos, count_);
     return data_[pos].element;
   }
 
@@ -551,13 +566,13 @@ namespace px_sched {
   template< class T>
   inline const T&  ObjectPool<T>::get(uint32_t hnd) const {
     uint32_t pos = hnd & kPosMask;
-    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %zu hnd:%zu", pos, count_);
+    PX_SCHED_CHECK_FN(pos < count_, "Invalid access to pos %zu hnd:%zu", pos, count_);
     return data_[pos].element;
   }
 
   template< class T>
   inline uint32_t ObjectPool<T>::info(size_t pos, uint32_t *count, uint32_t *ver) const {
-    PX_SCHED_CHECK(pos < count_, "Invalid access to pos %zu hnd:%zu", pos, count_);
+    PX_SCHED_CHECK_FN(pos < count_, "Invalid access to pos %zu hnd:%zu", pos, count_);
     uint32_t s = data_[pos].state.load();
     if (count) *count = (s & kRefMask);
     if (ver) *ver = (s & kVerMask) >> kVerDisp;
@@ -585,7 +600,7 @@ namespace px_sched {
       }
       tries++;
       // TODO... make this, optional...
-      PX_SCHED_CHECK(tries < count_*count_, "It was not possible to find a valid index after %u tries", tries);
+      PX_SCHED_CHECK_FN(tries < count_*count_, "It was not possible to find a valid index after %u tries", tries);
     }
   }
 
@@ -597,10 +612,10 @@ namespace px_sched {
     for(;;) {
       uint32_t prev = d.state.load();
       uint32_t next = prev - 1;
-      PX_SCHED_CHECK((prev & kVerMask) == ver,
+      PX_SCHED_CHECK_FN((prev & kVerMask) == ver,
           "Invalid unref HND = %u(%u), Versions: %u vs %u",
           pos, hnd, prev & kVerMask, ver);
-      PX_SCHED_CHECK((prev & kRefMask) > 1,
+      PX_SCHED_CHECK_FN((prev & kRefMask) > 1,
           "Invalid unref HND = %u(%u), invalid ref count",
           pos, hnd);
       if (d.state.compare_exchange_strong(prev, next)) {
@@ -624,10 +639,10 @@ namespace px_sched {
     for(;;) {
       uint32_t prev = d.state.load();
       uint32_t next = prev - 1;
-      PX_SCHED_CHECK((prev & kVerMask) == ver,
+      PX_SCHED_CHECK_FN((prev & kVerMask) == ver,
           "Invalid unref HND = %u(%u), Versions: %u vs %u",
           pos, hnd, prev & kVerMask, ver);
-      PX_SCHED_CHECK((prev & kRefMask) > 1,
+      PX_SCHED_CHECK_FN((prev & kRefMask) > 1,
           "Invalid unref HND = %u(%u), invalid ref count",
           pos, hnd);
       if (d.state.compare_exchange_strong(prev, next)) {
@@ -651,7 +666,7 @@ namespace px_sched {
       uint32_t prev = d.state.load();
       uint32_t next_c =((prev & kRefMask) +1);
       if ((prev & kVerMask) != ver || next_c <= 2) return false;
-      PX_SCHED_CHECK(next_c  == (next_c & kRefMask), "Too many references...");
+      PX_SCHED_CHECK_FN(next_c  == (next_c & kRefMask), "Too many references...");
       uint32_t next = (prev & kVerMask) | next_c ;
       if (d.state.compare_exchange_strong(prev, next)) {
         return true;
@@ -749,7 +764,7 @@ namespace px_sched {
   void Scheduler::CurrentThreadBeforeLockResource(const void *resource_ptr, const char *name) {
     // if the lock might work, wake up one thread to replace this one
     TLS *d = tls();
-    if (d->scheduler) {
+    if (d->scheduler && d->scheduler->running_.load()) {
       d->scheduler->active_threads_.fetch_sub(1);
       d->scheduler->wakeUpOneThread();
     }
@@ -759,7 +774,7 @@ namespace px_sched {
   void Scheduler::CurrentThreadAfterLockResource(bool success) {
     // mark this thread as active (so eventually one thread will step down)
     TLS *d = tls();
-    if (d->scheduler) {
+    if (d->scheduler && d->scheduler->running_.load()) {
       d->scheduler->active_threads_.fetch_add(1);
     }
     if (success && d->next_lock.ptr) {
@@ -781,7 +796,7 @@ namespace px_sched {
         if (f->ptr == resource_ptr) break;
         f++;
       };
-      PX_SCHED_CHECK(f != d->adquired_locks.end(), "Can't find resource %p as adquired", resource_ptr);
+      PX_SCHED_CHECK_FN(f != d->adquired_locks.end(), "Can't find resource %p as adquired", resource_ptr);
       // replace resource with last, and pop (to avoid shifting elements in the vector)
       std::swap(*f, d->adquired_locks.back());
       d->adquired_locks.pop_back();
@@ -834,13 +849,13 @@ namespace px_sched {
     tasks_.init(params_.max_number_tasks, params_.mem_callbacks);
     counters_.init(params_.max_number_tasks, params_.mem_callbacks);
     ready_tasks_.init(params_.max_number_tasks, params_.mem_callbacks);
-    PX_SCHED_CHECK(workers_ == nullptr, "workers_ ptr should be null here...");
+    PX_SCHED_CHECK_FN(workers_ == nullptr, "workers_ ptr should be null here...");
     workers_ = static_cast<Worker*>(params_.mem_callbacks.alloc_fn(sizeof(Worker)*params_.num_threads));
     for(uint16_t i = 0; i < params_.num_threads; ++i) {
       new (&workers_[i]) Worker();
       workers_[i].thread_index = i;
     }
-    PX_SCHED_CHECK(active_threads_.load() == 0, "Invalid active threads num");
+    PX_SCHED_CHECK_FN(active_threads_.load() == 0, "Invalid active threads num");
     for(uint16_t i = 0; i < params_.num_threads; ++i) {
       workers_[i].thread = std::thread(WorkerThreadMain, this, &workers_[i]);
     }
@@ -861,7 +876,7 @@ namespace px_sched {
       tasks_.reset();
       counters_.reset();
       ready_tasks_.reset();
-      PX_SCHED_CHECK(active_threads_.load() == 0, "Invalid active threads num --> %u", active_threads_.load());
+      PX_SCHED_CHECK_FN(active_threads_.load() == 0, "Invalid active threads num --> %u", active_threads_.load());
     }
   }
   
@@ -980,14 +995,14 @@ namespace px_sched {
   }
 
   void Scheduler::run(const Job &job, Sync *sync_obj) {
-    PX_SCHED_CHECK(running_, "Scheduler not running");
+    PX_SCHED_CHECK_FN(running_, "Scheduler not running");
     uint32_t t_ref = createTask(job, sync_obj);
     ready_tasks_.push(t_ref);
     wakeUpOneThread();
   }
 
   void Scheduler::runAfter(Sync _trigger, const Job& _job, Sync* _sync_obj) {
-    PX_SCHED_CHECK(running_, "Scheduler not running");
+    PX_SCHED_CHECK_FN(running_, "Scheduler not running");
     uint32_t trigger = _trigger.hnd;
     uint32_t t_ref = createTask(_job, _sync_obj);
     bool valid = counters_.ref(trigger);
@@ -1011,7 +1026,7 @@ namespace px_sched {
   void Scheduler::waitFor(Sync s) {
     if (counters_.ref(s.hnd)) {
       Counter &counter = counters_.get(s.hnd);
-      PX_SCHED_CHECK(counter.wait_ptr == nullptr, "Sync object already used for waitFor operation, only one is permited");
+      PX_SCHED_CHECK_FN(counter.wait_ptr == nullptr, "Sync object already used for waitFor operation, only one is permited");
       WaitFor wf;
       counter.wait_ptr = &wf;
       unrefCounter(s.hnd);
