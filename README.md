@@ -1,3 +1,7 @@
+# *WARNING*: Project Moved!!
+I moved this project here [px/px_sched.h](https://github.com/pplux/px/blob/master/px_render.h) to be part of a larger collection of single header libraries [px](https://github.com/pplux/px) , please update your references/starts/links...
+
+
 [![Build Status](https://travis-ci.org/pplux/px_sched.svg?branch=master)](https://travis-ci.org/pplux/px_sched)
 [![Build Status AppVeyor](https://ci.appveyor.com/api/projects/status/github/pplux/px_sched)](https://ci.appveyor.com/project/pplux/px-sched)
 
